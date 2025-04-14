@@ -2,6 +2,7 @@
 import requests
 import time
 from django.conf import settings  
+import re
 
 # Our in-memory token cache
 TOKEN_CACHE = {
@@ -50,28 +51,64 @@ def get_client_credentials_token():
 
 def get_channel_info(channel_slug):
     """
-    Use the Bearer token to retrieve channel info from Kick's official channels endpoint.
+    Get information about a Kick channel.
+    Returns a dictionary with channel information.
     """
-    access_token = get_client_credentials_token()
-    if not access_token:
-        return {"is_live": False, "title": "Offline (no token)"}
-
-    channel_url = f"https://kick.com/api/v2/channels/{channel_slug}"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/json",
-    }
-
     try:
-        resp = requests.get(channel_url, headers=headers, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-
-        is_live = data.get("is_live", False)
-        title = data.get("session_title", "N/A")
-
-        return {"is_live": is_live, "title": title}
-
-    except requests.RequestException as e:
-        print("DEBUG: Error fetching channel info", e)
-        return {"is_live": False, "title": "Offline (error)"}
+        # Use a realistic browser User-Agent and headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
+            'DNT': '1',
+            'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"'
+        }
+        
+        # Get the channel page to check if stream is live
+        channel_url = f"https://kick.com/{channel_slug}"
+        response = requests.get(channel_url, headers=headers)
+        
+        print(f"DEBUG: Channel Page Response Status: {response.status_code}")
+        
+        if response.status_code == 200:
+            # Check if stream is live by looking for isLiveBroadcast in the page
+            is_live = "isLiveBroadcast" in response.text
+            
+            # Try to get the stream title from the page
+            title = "Live Stream"
+            title_match = re.search(r'<title>(.*?)</title>', response.text)
+            if title_match:
+                title = title_match.group(1).split(' - ')[0]
+            
+            # Construct the stream URL using the format from StreamCompanion
+            stream_url = f"https://fa723fc1b171.us-west-2.playback.live-video.net/api/video/v1/us-west-2.196233775518.channel.{channel_slug}.m3u8"
+            
+            return {
+                "is_live": is_live,
+                "title": title,
+                "playback_url": stream_url
+            }
+        else:
+            print(f"DEBUG: Channel Page Error: {response.status_code}")
+            return {
+                "is_live": False,
+                "title": "Error Checking Stream",
+                "playback_url": None
+            }
+        
+    except Exception as e:
+        print(f"DEBUG: Error in get_channel_info: {str(e)}")
+        return {
+            "is_live": False,
+            "title": "Error Checking Stream",
+            "playback_url": None
+        }
