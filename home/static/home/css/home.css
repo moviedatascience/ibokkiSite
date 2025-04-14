@@ -1,0 +1,107 @@
+/* Reset & Global Styling */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: sans-serif;
+    background-color: #1a1a1a; /* Dark charcoal gray */
+    color: #ffffff;            /* White text */
+    box-sizing: border-box;
+  }
+  
+  /* Inherit box-sizing globally */
+  *, *::before, *::after {
+    box-sizing: inherit;
+  }
+  
+  /* 
+    Main container that fills the entire viewport (100vh).
+    We center items both horizontally and vertically.
+    We allow wrapping so if the viewport isn't wide enough,
+    items will stack.
+  */
+  .home-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;  /* Center horizontally */
+    align-items: center;      /* Center vertically */
+    height: 100vh;            /* Fill the screen vertically */
+    gap: 2rem;                /* Space between items */
+    padding: 1rem;
+  }
+  
+  /*
+    Each "card" for Watch/Shop.
+    - We use percentage-based width/height (vw = viewport width),
+      so they scale with screen size.
+    - We also set max-width/height so they don't get *too* big on huge screens.
+  */
+  .home-item {
+    display: flex;
+    flex-direction: column;  /* Text above image */
+    align-items: center;
+    text-decoration: none;   /* Remove link underline */
+    color: inherit;
+  
+    width: 40vw;     /* 40% of viewport width */
+    height: 40vw;    /* Make them squares, so 40vw x 40vw */
+    max-width: 600px;
+    max-height: 600px;
+    background-color: #2a2a2a; /* Slightly lighter background for the card */
+    border-radius: 4px;
+    overflow: hidden;          /* Hide any letterbox overflow if it spills outside */
+    transition: transform 0.2s;
+  }
+  
+  /* Subtle hover scale */
+  .home-item:hover {
+    transform: scale(1.05);
+  }
+  
+  /* Text label sits at the top, some spacing. */
+  .home-item p {
+    margin: 1rem 0 0.5rem;
+    font-size: 1.4rem;
+    font-weight: bold;
+  }
+  
+  /* 
+    Image wrapper flexes to fill remaining space within the .home-item,
+    letting the text above it consume just enough vertical space.
+  */
+  .home-item .image-wrapper {
+    flex: 1; /* This pushes the image area to fill leftover space */
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* 
+    The image will fill the .image-wrapper as much as possible 
+    while preserving aspect ratio. 
+    'object-fit: contain' means no cropping, but you'll see letterbox 
+    (empty space) if the aspect ratio doesn't match the square container.
+  */
+  .home-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    border: none;
+  }
+  
+  /*
+    On smaller screens (under 700px, for example),
+    force each item to be nearly full width, and
+    set a fixed height if you prefer, or let them auto-size.
+  */
+  @media (max-width: 700px) {
+    .home-item {
+      width: 80vw;
+      height: 80vw;
+      max-width: 400px;
+      max-height: 400px;
+    }
+  }
+  

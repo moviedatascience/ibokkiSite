@@ -1,0 +1,102 @@
+/* Navigation Bar */
+.top-nav {
+    display: flex;
+    justify-content: space-between; /* Space links out: left group, right group */
+    align-items: center;
+    background-color: #121212; /* Dark nav background */
+    padding: 0.75rem 1rem;
+  }
+  
+  .nav-left,
+  .nav-right {
+    display: flex;
+    gap: 1.5rem; /* Spacing between links in each group */
+  }
+  
+  .nav-link {
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.2s;
+  }
+  
+  .nav-link:hover {
+    color: #aaa; /* Slight highlight on hover */
+  }
+  
+
+/* Simple reset & base styling */
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: sans-serif;
+    background-color: #1a1a1a; /* Dark background */
+    color: #ffffff;
+    box-sizing: border-box;
+  }
+  
+  *, *::before, *::after {
+    box-sizing: inherit;
+  }
+  
+  /* Container that centers content vertically & horizontally */
+  .landing-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh; /* Fill the viewport */
+    padding: 2rem;
+    text-align: center; 
+  }
+  
+  /* The main image for offline/online state */
+  .landing-main-image {
+    max-width: 600px;
+    width: 80%;
+    height: auto;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+  }
+  
+  /* The stream title or offline message */
+  .landing-title {
+    font-size: 1.5rem;
+    margin: 0 0 2rem; /* bottom spacing before the buttons */
+  }
+  
+  /* Button container */
+  .landing-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap; /* wrap on small screens */
+    justify-content: center; 
+  }
+  
+  /* Each button style */
+  .landing-button {
+    background-color: #3a3a3a;
+    color: #ffffff;
+    text-decoration: none;
+    padding: 0.8rem 1.2rem;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background-color 0.2s, transform 0.2s;
+  }
+  
+  .landing-button:hover {
+    background-color: #5a5a5a;
+    transform: scale(1.05);
+  }
+  
+  /* Responsive tweak for narrower devices (less than 500px) */
+  @media (max-width: 500px) {
+    .landing-main-image {
+      width: 90%;
+    }
+    .landing-title {
+      font-size: 1.2rem;
+    }
+  }
+  

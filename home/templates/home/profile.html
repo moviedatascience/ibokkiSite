@@ -1,0 +1,19 @@
+<!-- home/profile.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Profile</title>
+</head>
+<body>
+  <h1>Profile Page</h1>
+  <p>Username: {{ user.username }}</p>
+  <p>Email: {{ user.email }}</p>
+
+  <!-- If you want a "Logout" link, you can do: -->
+  <form method="post" action="{% url 'logout' %}">
+    {% csrf_token %}
+    <button type="submit">Log Out</button>
+  </form>
+</body>
+</html>
