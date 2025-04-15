@@ -6,28 +6,16 @@
         <!-- Stream Section -->
         <div class="lg:w-3/4">
             <div class="relative" style="padding-top: 56.25%;"> <!-- 16:9 aspect ratio -->
-                {% if is_live %}
-                <video
-                    id="stream-player"
-                    class="video-js vjs-default-skin vjs-big-play-centered absolute top-0 left-0 w-full h-full"
-                    controls
-                    preload="auto"
-                    data-setup='{"techOrder": ["html5", "hls"], "html5": {"hls": {"overrideNative": true}}}'
-                >
-                    <source type="application/x-mpegURL" src="{{ stream_url }}">
-                    <p class="vjs-no-js">
-                        To view this video please enable JavaScript, and consider upgrading to a
-                        web browser that supports HTML5 video
-                    </p>
-                </video>
-                {% else %}
-                <div class="absolute top-0 left-0 w-full h-full bg-gray-900 flex items-center justify-center">
-                    <div class="text-center text-white">
-                        <h2 class="text-2xl font-bold mb-4">Stream Offline</h2>
-                        <p>The stream is currently offline. Please check back later.</p>
-                    </div>
-                </div>
-                {% endif %}
+                <iframe
+                    src="https://player.kick.com/{{ channel_slug }}"
+                    height="720"
+                    width="1280"
+                    frameborder="0"
+                    scrolling="no"
+                    allowfullscreen="true"
+                    class="absolute top-0 left-0 w-full h-full"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                ></iframe>
             </div>
             <div class="mt-4">
                 <h1 class="text-2xl font-bold">{{ stream_title }}</h1>
@@ -35,8 +23,7 @@
                 <div class="mt-2 p-4 bg-gray-100 rounded">
                     <h3 class="font-semibold mb-2">Debug Information:</h3>
                     <p class="text-sm text-gray-600">Channel: {{ channel_slug }}</p>
-                    <p class="text-sm text-gray-600">Stream URL: {{ stream_url }}</p>
-                    <p class="text-sm text-gray-600">Status: {% if is_live %}Live{% else %}Offline{% endif %}</p>
+                    <p class="text-sm text-gray-600">Status: Live</p>
                 </div>
             </div>
         </div>
@@ -83,59 +70,11 @@
 </div>
 
 {% block extra_js %}
-<!-- Video.js CSS -->
-<link href="https://vjs.zencdn.net/7.2.3/video-js.css" rel="stylesheet" />
-
-<!-- Video.js -->
-<script src="https://vjs.zencdn.net/7.2.3/video.js"></script>
-
-<!-- HLS support -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-hls/5.14.1/videojs-contrib-hls.js"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     const chatMessages = document.getElementById('chat-messages');
-
-    {% if is_live %}
-    // Initialize Video.js player
-    var player = videojs('stream-player', {
-        fluid: true,
-        aspectRatio: '16:9',
-        html5: {
-            hls: {
-                overrideNative: true,
-                debug: true
-            }
-        }
-    });
-
-    // Add error handling
-    player.on('error', function() {
-        console.error('Video.js error:', player.error());
-        // Show error message to user
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'absolute top-0 left-0 w-full h-full bg-gray-900 flex items-center justify-center';
-        errorDiv.innerHTML = `
-            <div class="text-center text-white">
-                <h2 class="text-2xl font-bold mb-4">Stream Error</h2>
-                <p>Unable to load the stream. Please try again later.</p>
-                <p class="text-sm mt-2">Error: ${player.error().message}</p>
-                <p class="text-sm mt-2">Stream URL: {{ stream_url }}</p>
-            </div>
-        `;
-        player.el().parentNode.appendChild(errorDiv);
-    });
-
-    // Add source change handling
-    player.on('loadstart', function() {
-        console.log('Loading stream:', '{{ stream_url }}');
-    });
-
-    // Start playback
-    player.play();
-    {% endif %}
 
     chatForm.addEventListener('submit', function(e) {
         e.preventDefault();
