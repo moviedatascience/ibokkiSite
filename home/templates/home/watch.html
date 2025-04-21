@@ -18,21 +18,21 @@
                 ></iframe>
             </div>
             <div class="mt-4">
-                <h1 class="text-2xl font-bold">{{ stream_title }}</h1>
-                <p class="text-gray-600">Streaming on Kick</p>
-                <div class="mt-2 p-4 bg-gray-100 rounded">
-                    <h3 class="font-semibold mb-2">Debug Information:</h3>
-                    <p class="text-sm text-gray-600">Channel: {{ channel_slug }}</p>
-                    <p class="text-sm text-gray-600">Status: Live</p>
+                <h1 class="text-2xl font-bold text-gray-100">{{ stream_title }}</h1>
+                <p class="text-gray-400">Streaming on Kick</p>
+                <div class="mt-2 p-4 bg-gray-800 rounded border border-gray-700">
+                    <h3 class="font-semibold mb-2 text-gray-200">Debug Information:</h3>
+                    <p class="text-sm text-gray-400">Channel: {{ channel_slug }}</p>
+                    <p class="text-sm text-gray-400">Status: Live</p>
                 </div>
             </div>
         </div>
 
         <!-- Chat Section -->
         <div class="lg:w-1/4">
-            <div class="bg-gray-900 rounded-lg h-[600px] flex flex-col">
+            <div class="bg-gray-800 rounded-lg h-[600px] flex flex-col border border-gray-700">
                 <div class="p-4 border-b border-gray-700">
-                    <h2 class="text-lg font-semibold text-white">Chat</h2>
+                    <h2 class="text-lg font-semibold text-gray-100">Chat</h2>
                 </div>
                 
                 <!-- Chat Messages -->
@@ -46,13 +46,13 @@
                         <input
                             type="text"
                             id="chat-input"
-                            class="flex-1 bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="flex-1 bg-gray-700 text-gray-100 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
                             placeholder="Type a message..."
                             {% if not user.is_authenticated %}disabled{% endif %}
                         >
                         <button
                             type="submit"
-                            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            class="bg-blue-600 text-gray-100 px-4 py-2 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             {% if not user.is_authenticated %}disabled{% endif %}
                         >
                             Send
