@@ -173,3 +173,6 @@ PREPEND_WWW = False
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# YouTube API Settings
+YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
