@@ -1,90 +1,103 @@
 {% extends "home/base.html" %}
+{% load static %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="flex flex-col lg:flex-row gap-4">
-        <!-- Stream Section -->
-        <div class="lg:w-3/4">
-            <div class="relative" style="padding-top: 56.25%;"> <!-- 16:9 aspect ratio -->
-                <iframe
-                    src="https://player.kick.com/{{ channel_slug }}"
-                    height="720"
-                    width="1280"
-                    frameborder="0"
-                    scrolling="no"
-                    allowfullscreen="true"
-                    class="absolute top-0 left-0 w-full h-full"
-                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                ></iframe>
+<div class="stream-container">
+    <div class="stream-player">
+        {% if channel_slug %}
+            <iframe
+                src="{{ embed_url }}"
+                width="100%"
+                height="100%"
+                frameborder="0"
+                scrolling="no"
+                allowfullscreen
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            ></iframe>
+        {% else %}
+            <div class="no-stream">
+                <h2>No Stream Available</h2>
+                <p>Please check back later or select another stream.</p>
             </div>
-            <div class="mt-4">
-                <h1 class="text-2xl font-bold text-youtube-primary">{{ stream_title }}</h1>
-                <p class="text-youtube-secondary">Streaming on Kick</p>
-                <div class="mt-2 p-4 bg-youtube-secondary rounded-lg border border-youtube">
-                    <h3 class="font-semibold mb-2 text-youtube-primary">Debug Information:</h3>
-                    <p class="text-sm text-youtube-secondary">Channel: {{ channel_slug }}</p>
-                    <p class="text-sm text-youtube-secondary">Status: Live</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Chat Section -->
-        <div class="lg:w-1/4">
-            <div class="bg-youtube-secondary rounded-lg h-[600px] flex flex-col border border-youtube">
-                <div class="p-4 border-b border-youtube">
-                    <h2 class="text-lg font-semibold text-youtube-primary">Chat</h2>
-                </div>
-                
-                <!-- Chat Messages -->
-                <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages">
-                    <!-- Messages will be inserted here -->
-                </div>
-
-                <!-- Chat Input -->
-                <div class="p-4 border-t border-youtube">
-                    <form id="chat-form" class="flex gap-2">
-                        <input
-                            type="text"
-                            id="chat-input"
-                            class="flex-1 bg-[#0f0f0f] text-youtube-primary rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-500 border border-youtube"
-                            placeholder="Type a message..."
-                            {% if not user.is_authenticated %}disabled{% endif %}
-                        >
-                        <button
-                            type="submit"
-                            class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500"
-                            {% if not user.is_authenticated %}disabled{% endif %}
-                        >
-                            Send
-                        </button>
-                    </form>
-                    {% if not user.is_authenticated %}
-                    <p class="text-sm text-youtube-secondary mt-2">
-                        Please <a href="{% url 'discord_login' %}" class="text-[#ff0000] hover:underline">login</a> to chat
-                    </p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+        {% endif %}
+    </div>
+    
+    <div class="stream-selector">
+        <select id="stream-select" class="form-select">
+            {% for stream in active_streams %}
+                <option value="{{ stream.channel_slug }}" {% if stream.channel_slug == current_stream %}selected{% endif %}>
+                    {{ stream.channel_slug }} ({{ stream.get_platform_display }}){% if stream.is_featured %} [Featured]{% endif %}
+                </option>
+            {% endfor %}
+        </select>
     </div>
 </div>
 
-{% block extra_js %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const chatForm = document.getElementById('chat-form');
-    const chatInput = document.getElementById('chat-input');
-    const chatMessages = document.getElementById('chat-messages');
+<style>
+.stream-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 60px);
+    gap: 20px;
+    padding: 20px;
+}
 
-    chatForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const message = chatInput.value.trim();
-        if (message) {
-            // TODO: Implement chat message sending
-            chatInput.value = '';
+.stream-player {
+    flex: 1;
+    background: #1a1a1a;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.stream-selector {
+    padding: 10px;
+    background: #1a1a1a;
+    border-radius: 8px;
+}
+
+.form-select {
+    width: 100%;
+    padding: 8px;
+    background: #2a2a2a;
+    border: 1px solid #3a3a3a;
+    border-radius: 4px;
+    color: #fff;
+}
+
+.no-stream {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+}
+
+iframe {
+    border: none;
+}
+</style>
+
+<script>
+document.getElementById('stream-select').addEventListener('change', function(e) {
+    const streamSlug = e.target.value;
+    const formData = new FormData();
+    formData.append('stream_slug', streamSlug);
+    
+    fetch('/switch-stream/', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         }
-    });
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        }
+    })
+    .catch(error => console.error('Error:', error));
 });
 </script>
-{% endblock %}
 {% endblock %} 
