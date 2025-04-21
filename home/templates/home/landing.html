@@ -24,31 +24,31 @@
             </div>
             <div class="mt-4">
                 {% if is_stream_live %}
-                    <h1 class="text-2xl font-bold text-gray-100">{{ current_stream_title }}</h1>
-                    <p class="text-gray-400 mt-2">Stream is Live on Kick</p>
+                    <h1 class="text-2xl font-bold text-youtube-primary">{{ current_stream_title }}</h1>
+                    <p class="text-youtube-secondary mt-2">Stream is Live on Kick</p>
                 {% else %}
-                    <h1 class="text-2xl font-bold text-gray-100">Stream is Currently Offline</h1>
-                    <p class="text-gray-400 mt-2">Check back later for more content!</p>
+                    <h1 class="text-2xl font-bold text-youtube-primary">Stream is Currently Offline</h1>
+                    <p class="text-youtube-secondary mt-2">Check back later for more content!</p>
                 {% endif %}
                 
                 <div class="mt-6 flex gap-4">
                     {% if user.is_authenticated %}
-                        <a href="{% url 'watch' %}" class="bg-blue-600 text-gray-100 px-6 py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                        <a href="{% url 'watch' %}" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
                             Watch Stream
                         </a>
                     {% else %}
-                        <a href="{% url 'discord_login' %}?next=/watch/" class="bg-blue-600 text-gray-100 px-6 py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                        <a href="{% url 'discord_login' %}?next=/watch/" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
                             Login to Watch
                         </a>
                     {% endif %}
-                    <a href="#" class="bg-gray-700 text-gray-100 px-6 py-3 rounded-lg hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
+                    <a href="#" class="bg-youtube-secondary text-youtube-primary px-6 py-3 rounded-lg hover:bg-youtube-secondary focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
                         Subscribe
                     </a>
                 </div>
 
-                <div class="mt-8 p-4 bg-gray-800 rounded-lg border border-gray-700">
-                    <h3 class="font-semibold mb-2 text-gray-200">Stream Information</h3>
-                    <p class="text-sm text-gray-400">Join our community to watch streams, chat with other viewers, and get notified when we go live!</p>
+                <div class="mt-8 p-4 bg-youtube-secondary rounded-lg border border-youtube">
+                    <h3 class="font-semibold mb-2 text-youtube-primary">Stream Information</h3>
+                    <p class="text-sm text-youtube-secondary">Join our community to watch streams, chat with other viewers, and get notified when we go live!</p>
                 </div>
             </div>
         </div>
