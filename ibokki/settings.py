@@ -27,7 +27,7 @@ KICK_CLIENT_ID = os.getenv("KICK_CLIENT_ID")
 
 KICK_CLIENT_SECRET = os.getenv("KICK_CLIENT_SECRET")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".ngrok-free.app"]
 
 
 # Application definition
@@ -120,10 +120,54 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+# Session settings
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
+SESSION_COOKIE_SECURE = False  # Set to True in production
+SESSION_COOKIE_HTTPONLY = True
+SESSION_SAVE_EVERY_REQUEST = True
+
+# Authentication backends
+AUTHENTICATION_BACKENDS = [
+    'home.auth.DiscordAuthBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Discord settings, loaded from .env
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-DISCORD_REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI", "http://127.0.0.1:8000/discord/callback")
+
+# Handle admin IDs
+raw_admin_ids = os.getenv("DISCORD_ADMIN_IDS", "")
+print(f"\n=== Settings Debug ===")
+print(f"Raw DISCORD_ADMIN_IDS from env: {raw_admin_ids}")
+DISCORD_ADMIN_IDS = [id.strip().replace('discord_', '') for id in raw_admin_ids.split(",") if id.strip()]
+print(f"Processed DISCORD_ADMIN_IDS: {DISCORD_ADMIN_IDS}")
+print("=== End Settings Debug ===\n")
+
+# Environment settings
+ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # 'local' or 'production'
+BASE_URL = "http://localhost:8000" if ENVIRONMENT == "local" else os.getenv("BASE_URL", "https://your-production-domain.com")
+DISCORD_REDIRECT_URI = f"{BASE_URL}/discord/callback"
+
+# Auth settings
+LOGIN_URL = "/discord/login/"  # Use relative URL
+LOGIN_REDIRECT_URL = "/watch/"  # Use relative URL
+
+# Security settings
+if ENVIRONMENT == "production":
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+
+# Append slash settings
+APPEND_SLASH = True
+PREPEND_WWW = False
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
