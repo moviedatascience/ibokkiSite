@@ -99,14 +99,20 @@ class StreamSettings(models.Model):
 
     def get_embed_url(self):
         if self.platform == 'kick':
+            # For local development, use the alternative embed URL
+            if settings.ENVIRONMENT == 'local':
+                return f"https://player.kick.com/embed/{self.channel_slug}"
             return f"https://player.kick.com/{self.channel_slug}"
         elif self.platform == 'youtube':
             # Try to get the current live stream ID
             live_stream_id = self.get_youtube_live_stream_id()
             if live_stream_id:
-                return f"https://www.youtube.com/embed/{live_stream_id}"
+                # Add origin parameter for local development
+                origin = 'http://localhost:8000' if settings.ENVIRONMENT == 'local' else settings.BASE_URL
+                return f"https://www.youtube.com/embed/{live_stream_id}?origin={origin}"
             return None
         elif self.platform == 'twitch':
+            # Use the parent domain from settings
             return f"https://player.twitch.tv/?channel={self.channel_slug}&parent={settings.TWITCH_PARENT_DOMAIN}"
         return None
 

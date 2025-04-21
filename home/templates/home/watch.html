@@ -5,15 +5,26 @@
 <div class="stream-container">
     <div class="stream-player">
         {% if channel_slug %}
-            <iframe
-                src="{{ embed_url }}"
-                width="100%"
-                height="100%"
-                frameborder="0"
-                scrolling="no"
-                allowfullscreen
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            ></iframe>
+            {% if embed_url %}
+                <iframe
+                    src="{{ embed_url }}"
+                    width="100%"
+                    height="100%"
+                    frameborder="0"
+                    scrolling="no"
+                    allowfullscreen
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                ></iframe>
+            {% else %}
+                <div class="no-stream">
+                    <h2>Stream Not Available</h2>
+                    <p>The stream is not currently live or available.</p>
+                    {% if request.get_host == 'localhost:8000' %}
+                        <p class="dev-note">Note: In local development, you may need to open the stream in a new tab:</p>
+                        <a href="{{ embed_url }}" target="_blank" class="open-stream-btn">Open Stream</a>
+                    {% endif %}
+                </div>
+            {% endif %}
         {% else %}
             <div class="no-stream">
                 <h2>No Stream Available</h2>
@@ -71,6 +82,29 @@
     justify-content: center;
     height: 100%;
     color: #666;
+    text-align: center;
+    padding: 20px;
+}
+
+.dev-note {
+    margin-top: 20px;
+    color: #888;
+    font-size: 0.9em;
+}
+
+.open-stream-btn {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 10px 20px;
+    background: #2a2a2a;
+    color: #fff;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background 0.3s;
+}
+
+.open-stream-btn:hover {
+    background: #3a3a3a;
 }
 
 iframe {
