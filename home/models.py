@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.conf import settings
+import requests
+import json
 
 # Create your models here.
 
@@ -15,6 +17,7 @@ class StreamSettings(models.Model):
     
     channel_slug = models.CharField(max_length=100, unique=True)
     platform = models.CharField(max_length=10, choices=PLATFORM_CHOICES, default='kick')
+    youtube_channel_id = models.CharField(max_length=100, blank=True, null=True, help_text="Required for YouTube streams. Find in channel URL.")
     is_featured = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
@@ -27,16 +30,82 @@ class StreamSettings(models.Model):
             featured_streams = StreamSettings.objects.filter(is_featured=True).exclude(pk=self.pk)
             if featured_streams.exists():
                 raise ValidationError("Only one stream can be featured at a time.")
+        
+        # Ensure YouTube channel ID is provided for YouTube streams
+        if self.platform == 'youtube' and not self.youtube_channel_id:
+            raise ValidationError("YouTube channel ID is required for YouTube streams.")
 
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    def get_youtube_live_stream_id(self):
+        """Fetch the current live stream ID for a YouTube channel"""
+        if not self.youtube_channel_id or not settings.YOUTUBE_API_KEY:
+            return None
+            
+        try:
+            # Handle both @handle and channel ID formats
+            if self.youtube_channel_id.startswith('@'):
+                # For @handle format, first get the channel ID
+                handle = self.youtube_channel_id[1:]  # Remove the @
+                channel_url = f"https://www.googleapis.com/youtube/v3/search?part=id&type=channel&q={handle}&key={settings.YOUTUBE_API_KEY}"
+                channel_response = requests.get(channel_url)
+                channel_data = channel_response.json()
+                
+                if 'items' not in channel_data or not channel_data['items']:
+                    return None
+                    
+                channel_id = channel_data['items'][0]['id']['channelId']
+            else:
+                # For direct channel ID format
+                channel_id = self.youtube_channel_id
+            
+            # Get the uploads playlist ID
+            channel_url = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id={channel_id}&key={settings.YOUTUBE_API_KEY}"
+            channel_response = requests.get(channel_url)
+            channel_data = channel_response.json()
+            
+            if 'items' not in channel_data or not channel_data['items']:
+                return None
+                
+            uploads_playlist_id = channel_data['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+            
+            # Get the latest video from the uploads playlist
+            playlist_url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={uploads_playlist_id}&maxResults=1&key={settings.YOUTUBE_API_KEY}"
+            playlist_response = requests.get(playlist_url)
+            playlist_data = playlist_response.json()
+            
+            if 'items' not in playlist_data or not playlist_data['items']:
+                return None
+                
+            video_id = playlist_data['items'][0]['snippet']['resourceId']['videoId']
+            
+            # Check if this video is currently live
+            video_url = f"https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={settings.YOUTUBE_API_KEY}"
+            video_response = requests.get(video_url)
+            video_data = video_response.json()
+            
+            if ('items' in video_data and 
+                video_data['items'] and 
+                'liveStreamingDetails' in video_data['items'][0]):
+                return video_id
+                
+            return None
+            
+        except Exception as e:
+            print(f"Error fetching YouTube live stream: {str(e)}")
+            return None
+
     def get_embed_url(self):
         if self.platform == 'kick':
             return f"https://player.kick.com/{self.channel_slug}"
         elif self.platform == 'youtube':
-            return f"https://www.youtube.com/embed/{self.channel_slug}"
+            # Try to get the current live stream ID
+            live_stream_id = self.get_youtube_live_stream_id()
+            if live_stream_id:
+                return f"https://www.youtube.com/embed/{live_stream_id}"
+            return None
         elif self.platform == 'twitch':
             return f"https://player.twitch.tv/?channel={self.channel_slug}&parent={settings.TWITCH_PARENT_DOMAIN}"
         return None
