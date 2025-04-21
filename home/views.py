@@ -10,26 +10,25 @@ from .kick_api import get_channel_info
 from .models import StreamSettings
 from django.contrib import messages
 from urllib.parse import urlparse
-from django.http import HttpResponseBadRequest
+from django.http import HttpResponseBadRequest, JsonResponse
 
 def landing_page(request):
     """Landing page view"""
-    # Get the active stream settings
-    try:
-        settings = StreamSettings.objects.get(is_active=True)
-        if not settings.channel_slug:
-            raise StreamSettings.DoesNotExist
-    except StreamSettings.DoesNotExist:
-        # If no active stream exists or channel_slug is empty, show landing page
-        return render(request, 'home/landing.html', {
-            'is_authenticated': request.user.is_authenticated,
-            'user': request.user
-        })
+    # Get the featured stream (default)
+    featured_stream = StreamSettings.objects.filter(is_featured=True, is_active=True).first()
+    
+    # If no featured stream, get any active stream
+    if not featured_stream:
+        featured_stream = StreamSettings.objects.filter(is_active=True).first()
     
     # Get channel info to check if stream is live
-    channel_data = get_channel_info(settings.channel_slug)
-    is_live = channel_data.get('is_live', False)
-    title = channel_data.get('title', 'Error Checking Stream')
+    if featured_stream:
+        channel_data = get_channel_info(featured_stream.channel_slug)
+        is_live = channel_data.get('is_live', False)
+        title = channel_data.get('title', 'Error Checking Stream')
+    else:
+        is_live = False
+        title = 'No Stream Available'
     
     context = {
         "is_stream_live": is_live,
@@ -138,32 +137,37 @@ def profile_view(request):
     })
 
 @login_required
-def watch_view(request):
-    """
-    View for watching the stream with embedded chat.
-    """
-    # Get the active stream settings
-    try:
-        stream_settings = StreamSettings.objects.get(is_active=True)
-        if not stream_settings.channel_slug:
-            raise StreamSettings.DoesNotExist
-    except StreamSettings.DoesNotExist:
-        messages.error(request, "No active stream settings found.")
-        return redirect('landing')
+def watch(request):
+    # Get the featured stream (default)
+    featured_stream = StreamSettings.objects.filter(is_featured=True).first()
     
-    # Get channel info to check if stream is live
-    channel_data = get_channel_info(stream_settings.channel_slug)
-    is_live = channel_data.get('is_live', False)
-    title = channel_data.get('title', 'Error Checking Stream')
+    # Get all active streams
+    active_streams = StreamSettings.objects.filter(is_active=True)
     
-    # Get the player URL for the channel
-    player_url = f"https://player.kick.com/{stream_settings.channel_slug}"
+    # Get the selected stream from session or use featured
+    selected_stream = request.session.get('selected_stream')
+    if selected_stream:
+        stream = StreamSettings.objects.filter(channel_slug=selected_stream).first()
+        if not stream or not stream.is_active:
+            stream = featured_stream
+    else:
+        stream = featured_stream
     
     context = {
-        "channel_slug": stream_settings.channel_slug,
-        "stream_title": title,
-        "player_url": player_url,
-        "is_live": is_live,
-        "error_message": title if not is_live else None
+        'stream_title': stream.channel_slug if stream else 'No Stream Available',
+        'channel_slug': stream.channel_slug if stream else None,
+        'embed_url': stream.get_embed_url() if stream else None,
+        'active_streams': active_streams,
+        'current_stream': stream.channel_slug if stream else None,
     }
-    return render(request, "home/watch.html", context)
+    return render(request, 'home/watch.html', context)
+
+def switch_stream(request):
+    if request.method == 'POST' and request.user.is_authenticated:
+        stream_slug = request.POST.get('stream_slug')
+        if stream_slug:
+            stream = StreamSettings.objects.filter(channel_slug=stream_slug, is_active=True).first()
+            if stream:
+                request.session['selected_stream'] = stream_slug
+                return JsonResponse({'success': True, 'channel_slug': stream_slug})
+    return JsonResponse({'success': False, 'error': 'Invalid request'})

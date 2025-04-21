@@ -3,11 +3,21 @@ from .models import StreamSettings
 
 @admin.register(StreamSettings)
 class StreamSettingsAdmin(admin.ModelAdmin):
-    list_display = ('channel_slug', 'is_active', 'updated_by', 'updated_at')
-    list_editable = ('is_active',)
-    readonly_fields = ('updated_by', 'updated_at')
-    list_filter = ('is_active',)
-
+    list_display = ('channel_slug', 'platform', 'is_featured', 'is_active', 'updated_at', 'updated_by')
+    list_filter = ('platform', 'is_featured', 'is_active')
+    search_fields = ('channel_slug',)
+    ordering = ('-is_featured', '-is_active', '-updated_at')
+    
+    fieldsets = (
+        ('Stream Information', {
+            'fields': ('channel_slug', 'platform')
+        }),
+        ('Stream Status', {
+            'fields': ('is_featured', 'is_active'),
+            'description': 'Featured stream will be shown by default. Active streams will be available for selection.'
+        }),
+    )
+    
     def save_model(self, request, obj, form, change):
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
