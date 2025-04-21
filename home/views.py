@@ -7,104 +7,126 @@ from django.contrib.auth import login
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from .kick_api import get_channel_info
+from .models import StreamSettings
+from django.contrib import messages
+from urllib.parse import urlparse
+from django.http import HttpResponseBadRequest
 
 def landing_page(request):
-    # If you want to show the real 'is_stream_live' and 'current_stream_title'
-    # from the 'get_channel_info' call, uncomment these lines:
-    """
-    channel_slug = "qoqsik"
-    channel_data = get_channel_info(channel_slug)
-    is_stream_live = channel_data["is_live"]
-    current_stream_title = channel_data["title"]
-    """
-
-    # For now, let's just pass some test data
+    """Landing page view"""
+    # Get the active stream settings
+    try:
+        settings = StreamSettings.objects.get(is_active=True)
+        if not settings.channel_slug:
+            raise StreamSettings.DoesNotExist
+    except StreamSettings.DoesNotExist:
+        # If no active stream exists or channel_slug is empty, show landing page
+        return render(request, 'home/landing.html', {
+            'is_authenticated': request.user.is_authenticated,
+            'user': request.user
+        })
+    
+    # Get channel info to check if stream is live
+    channel_data = get_channel_info(settings.channel_slug)
+    is_live = channel_data.get('is_live', False)
+    title = channel_data.get('title', 'Error Checking Stream')
+    
     context = {
-        "is_stream_live": True,
-        "current_stream_title": "Test Stream Title"
+        "is_stream_live": is_live,
+        "current_stream_title": title,
+        'is_authenticated': request.user.is_authenticated,
+        'user': request.user
     }
     return render(request, 'home/landing.html', context)
 
 def discord_login(request):
-    """
-    Step 1: Redirect the user to Discord’s OAuth2 page.
-    """
-    base_auth_url = "https://discord.com/oauth2/authorize"
-    scope = "identify email"  # or whichever scopes you need
-
-    # Build query string
-    import urllib.parse
-    query_params = {
-        "client_id": settings.DISCORD_CLIENT_ID,
-        "redirect_uri": settings.DISCORD_REDIRECT_URI,
-        "response_type": "code",
-        "scope": scope,
-    }
-    query_str = urllib.parse.urlencode(query_params)
-
-    discord_auth_url = f"{base_auth_url}?{query_str}"
+    """Handle Discord OAuth2 login"""
+    if not settings.DISCORD_CLIENT_ID or not settings.DISCORD_CLIENT_SECRET:
+        return HttpResponseBadRequest("Discord integration is not configured")
     
-    # If user selected "remember me", store it in session
-    if request.GET.get("remember_me") == "1":
-        request.session["remember_me"] = True
-
-    return redirect(discord_auth_url)
+    # Get the next URL from the request
+    next_url = request.GET.get('next', '/watch/')
+    
+    # Store the next URL in the session
+    request.session['next'] = next_url
+    
+    # Build the Discord OAuth2 URL
+    oauth_url = (
+        'https://discord.com/api/oauth2/authorize'
+        f'?client_id={settings.DISCORD_CLIENT_ID}'
+        f'&redirect_uri={settings.DISCORD_REDIRECT_URI}'
+        '&response_type=code'
+        '&scope=identify email'
+    )
+    
+    return redirect(oauth_url)
 
 def discord_callback(request):
-    """
-    Step 2: Discord redirects user back here with ?code=XYZ.
-    We exchange code for an access token, fetch user info, create user, log in.
-    """
-    code = request.GET.get("code")
+    code = request.GET.get('code')
     if not code:
-        return redirect("landing")
-
-    token_url = "https://discord.com/api/oauth2/token"
-    data = {
-        "client_id": settings.DISCORD_CLIENT_ID,
-        "client_secret": settings.DISCORD_CLIENT_SECRET,
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": settings.DISCORD_REDIRECT_URI,
-    }
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        return HttpResponseBadRequest("No code provided")
     
-    # Exchange the code for an access token
-    resp = requests.post(token_url, data=data, headers=headers)
-    resp.raise_for_status()
-    token_data = resp.json()
-    access_token = token_data.get("access_token")
-
-    # Fetch user info from Discord
-    user_info_url = "https://discord.com/api/users/@me"
-    auth_header = {"Authorization": f"Bearer {access_token}"}
-    user_resp = requests.get(user_info_url, headers=auth_header)
-    user_resp.raise_for_status()
-    discord_user = user_resp.json()
-
-    # Example: {"id": "12345", "username": "Bob", "discriminator": "1234", "email": "bob@example.com", ...}
-    discord_id = discord_user["id"]
-    username = discord_user["username"]
-    email = discord_user.get("email")
-
-    # Create or get a Django user
-    user, created = User.objects.get_or_create(username=f"discord_{discord_id}")
-    if email:
-        user.email = email
-    user.save()
-
-    # Log them in
-    login(request, user)
-
-    # If we want "Remember Me" to set a long session expiry, check session
-    if request.session.get("remember_me"):
-        # e.g. 30 days
-        request.session.set_expiry(60 * 60 * 24 * 30)
-    else:
-        # Expires when browser closes
-        request.session.set_expiry(0)
-
-    return redirect("profile")  # Go to the profile page
+    # Get the redirect URI from settings
+    redirect_uri = settings.DISCORD_REDIRECT_URI
+    
+    # Exchange code for token
+    data = {
+        'client_id': settings.DISCORD_CLIENT_ID,
+        'client_secret': settings.DISCORD_CLIENT_SECRET,
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': redirect_uri,
+    }
+    
+    try:
+        # Get access token
+        token_response = requests.post('https://discord.com/api/oauth2/token', data=data)
+        token_response.raise_for_status()
+        token_data = token_response.json()
+        access_token = token_data['access_token']
+        
+        # Get user info
+        user_response = requests.get('https://discord.com/api/users/@me', headers={
+            'Authorization': f'Bearer {access_token}'
+        })
+        user_response.raise_for_status()
+        user_info = user_response.json()
+        
+        # Store user info in session
+        request.session['discord_user'] = user_info
+        
+        # Get or create user
+        user, created = User.objects.get_or_create(
+            username=f"discord_{user_info['id']}",
+            defaults={
+                'email': user_info.get('email', ''),
+                'first_name': user_info.get('username', ''),
+            }
+        )
+        
+        # Update user info
+        user.email = user_info.get('email', '')
+        user.first_name = user_info.get('username', '')
+        user.save()
+        
+        # Log in the user
+        from home.auth import DiscordAuthBackend
+        backend = DiscordAuthBackend()
+        user.backend = f"{backend.__module__}.{backend.__class__.__name__}"
+        login(request, user)
+        
+        # Get next URL from session or default to watch page
+        next_url = request.session.pop('next', '/watch/')
+        
+        # Ensure the next URL is absolute
+        if not next_url.startswith('http'):
+            next_url = f"{settings.BASE_URL}{next_url}"
+        
+        return redirect(next_url)
+        
+    except requests.RequestException as e:
+        print(f"Error during Discord authentication: {str(e)}")
+        return HttpResponseBadRequest("Failed to authenticate with Discord")
 
 @login_required
 def profile_view(request):
@@ -114,3 +136,34 @@ def profile_view(request):
     return render(request, "home/profile.html", {
         "user": request.user
     })
+
+@login_required
+def watch_view(request):
+    """
+    View for watching the stream with embedded chat.
+    """
+    # Get the active stream settings
+    try:
+        stream_settings = StreamSettings.objects.get(is_active=True)
+        if not stream_settings.channel_slug:
+            raise StreamSettings.DoesNotExist
+    except StreamSettings.DoesNotExist:
+        messages.error(request, "No active stream settings found.")
+        return redirect('landing')
+    
+    # Get channel info to check if stream is live
+    channel_data = get_channel_info(stream_settings.channel_slug)
+    is_live = channel_data.get('is_live', False)
+    title = channel_data.get('title', 'Error Checking Stream')
+    
+    # Get the player URL for the channel
+    player_url = f"https://player.kick.com/{stream_settings.channel_slug}"
+    
+    context = {
+        "channel_slug": stream_settings.channel_slug,
+        "stream_title": title,
+        "player_url": player_url,
+        "is_live": is_live,
+        "error_message": title if not is_live else None
+    }
+    return render(request, "home/watch.html", context)

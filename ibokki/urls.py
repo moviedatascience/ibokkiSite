@@ -17,20 +17,17 @@ Including another URLconf
 
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
-from django.urls import path
-from home.views import (
-    landing_page,
-    discord_login,
-    discord_callback,
-    profile_view,
-)
+from django.urls import path, include
+from django.shortcuts import redirect
+from django.conf import settings
 
+def redirect_to_discord_login(request):
+    next_url = request.GET.get('next', '/watch/')
+    return redirect(f"{settings.BASE_URL}/discord/login/?next={next_url}")
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', landing_page, name='landing'),
-    path('discord/login/', discord_login, name='discord_login'),
-    path('discord/callback/', discord_callback, name='discord_callback'),
-    path('profile/', profile_view, name='profile'),
+    path('', include('home.urls')),
     path('logout/', auth_views.LogoutView.as_view(next_page='landing'), name='logout'),
+    path('accounts/login/', redirect_to_discord_login),  # Redirect default login to Discord login
 ]

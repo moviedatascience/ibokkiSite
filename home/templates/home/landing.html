@@ -17,21 +17,25 @@
 <!-- Navigation Bar -->
 <header class="top-nav">
   <div class="nav-left">
-    <!-- Keep your existing nav links or modify them as needed -->
-    <a href="#" class="nav-link">Home</a>
-    <a href="#" class="nav-link">Watch</a>
+    <a href="{% url 'landing' %}" class="nav-link">Home</a>
+    <a href="{% url 'watch' %}" class="nav-link">Watch</a>
     <a href="#" class="nav-link">Merch</a>
   </div>
   <div class="nav-right">
-    <!-- Instead of a plain link, we use a button that triggers our modal -->
-    <button
-      type="button"
-      class="btn btn-primary"
-      data-bs-toggle="modal"
-      data-bs-target="#authModal"
-    >
-      Sign Up or Log In
-    </button>
+    {% if is_authenticated %}
+      <a href="{% url 'profile' %}" class="btn btn-primary">
+        <i class="fas fa-user"></i> Profile
+      </a>
+    {% else %}
+      <button
+        type="button"
+        class="btn btn-primary"
+        data-bs-toggle="modal"
+        data-bs-target="#authModal"
+      >
+        <i class="fas fa-sign-in-alt"></i> Sign In
+      </button>
+    {% endif %}
   </div>
 </header>
 
@@ -71,9 +75,8 @@
 >
   <div class="modal-dialog">
     <div class="modal-content">
-
       <div class="modal-header">
-        <h5 class="modal-title" id="authModalLabel">Sign Up or Log In</h5>
+        <h5 class="modal-title" id="authModalLabel">Sign In with Discord</h5>
         <button
           type="button"
           class="btn-close"
@@ -83,16 +86,10 @@
       </div>
 
       <div class="modal-body">
-        <!-- "Continue with Discord" link -->
-        <a
-          href="{% url 'discord_login' %}"
-          id="discord-link"
-          class="btn btn-secondary"
-        >
-          Continue with Discord
+        <a href="{% url 'discord_login' %}" class="btn btn-primary w-100">
+          <i class="fab fa-discord"></i> Continue with Discord
         </a>
 
-        <!-- "Remember Me" checkbox -->
         <div class="form-check mt-3">
           <input
             class="form-check-input"
@@ -103,21 +100,6 @@
             Remember Me
           </label>
         </div>
-
-        <!-- Move the script BELOW the checkbox so 'rememberMeCheck' exists -->
-        <script>
-          // Attach the click event after the checkbox is in the DOM
-          const discordLink = document.getElementById("discord-link");
-          const rememberCheck = document.getElementById("rememberMeCheck");
-
-          discordLink.addEventListener("click", function(e) {
-            e.preventDefault();
-            const baseUrl = "{% url 'discord_login' %}";
-            const param = rememberCheck.checked ? "?remember_me=1" : "";
-            window.location.href = baseUrl + param;
-          });
-        </script>
-
       </div>
 
       <div class="modal-footer">
@@ -129,10 +111,15 @@
           Close
         </button>
       </div>
-
     </div>
   </div>
 </div>
+
+<!-- Add Font Awesome for icons -->
+<link
+  rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+>
 
 <!-- Bootstrap JS (for modals) -->
 <script
