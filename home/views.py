@@ -3,8 +3,7 @@
 import requests
 from django.shortcuts import redirect, render
 from django.conf import settings
-from django.contrib.auth import login
-from django.contrib.auth.models import User
+from django.contrib.auth import login, get_user_model
 from django.contrib.auth.decorators import login_required
 from .kick_api import get_channel_info
 from .models import StreamSettings
@@ -94,18 +93,25 @@ def discord_callback(request):
         # Store user info in session
         request.session['discord_user'] = user_info
         
-        # Get or create user
+        # Create username from Discord username and discriminator
+        username = f"{user_info['username']}#{user_info['discriminator']}"
+        
+        # Get or create user using the custom user model
+        User = get_user_model()
         user, created = User.objects.get_or_create(
-            username=f"discord_{user_info['id']}",
+            username=username,
             defaults={
                 'email': user_info.get('email', ''),
                 'first_name': user_info.get('username', ''),
+                'display_name': user_info.get('username', ''),
             }
         )
         
         # Update user info
         user.email = user_info.get('email', '')
         user.first_name = user_info.get('username', '')
+        if not user.display_name:
+            user.display_name = user_info.get('username', '')
         user.save()
         
         # Log in the user
@@ -130,8 +136,23 @@ def discord_callback(request):
 @login_required
 def profile_view(request):
     """
-    A simple profile page showing the current user's info.
+    Profile page showing the current user's info with ability to change display name.
     """
+    if request.method == 'POST':
+        new_display_name = request.POST.get('display_name')
+        if new_display_name:
+            try:
+                # Check if display name is already taken
+                User = get_user_model()
+                if User.objects.filter(display_name=new_display_name).exclude(pk=request.user.pk).exists():
+                    messages.error(request, 'That display name is already taken.')
+                else:
+                    request.user.display_name = new_display_name
+                    request.user.save()
+                    messages.success(request, 'Display name updated successfully!')
+            except Exception as e:
+                messages.error(request, f'Error updating display name: {str(e)}')
+    
     return render(request, "home/profile.html", {
         "user": request.user
     })

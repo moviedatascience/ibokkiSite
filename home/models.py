@@ -1,10 +1,19 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AbstractUser
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
 import json
+
+class CustomUser(AbstractUser):
+    display_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    
+    def save(self, *args, **kwargs):
+        # If display_name is not set, use the username without the discriminator
+        if not self.display_name and '#' in self.username:
+            self.display_name = self.username.split('#')[0]
+        super().save(*args, **kwargs)
 
 # Create your models here.
 
@@ -22,7 +31,7 @@ class StreamSettings(models.Model):
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
 
     def clean(self):
         # Ensure only one stream is featured
