@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "home",
+    "home.apps.HomeConfig",
 ]
 
 MIDDLEWARE = [
@@ -132,6 +132,9 @@ AUTHENTICATION_BACKENDS = [
     'home.auth.DiscordAuthBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+# Custom user model
+AUTH_USER_MODEL = 'home.CustomUser'
 
 # Discord settings, loaded from .env
 DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
