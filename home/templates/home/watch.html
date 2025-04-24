@@ -2,39 +2,10 @@
 {% load static %}
 
 {% block content %}
-<div class="stream-container">
-    <div class="stream-player">
-        {% if channel_slug %}
-            {% if embed_url %}
-                <iframe
-                    src="{{ embed_url }}"
-                    width="100%"
-                    height="100%"
-                    frameborder="0"
-                    scrolling="no"
-                    allowfullscreen
-                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                ></iframe>
-            {% else %}
-                <div class="no-stream">
-                    <h2>Stream Not Available</h2>
-                    <p>The stream is not currently live or available.</p>
-                    {% if request.get_host == 'localhost:8000' %}
-                        <p class="dev-note">Note: In local development, you may need to open the stream in a new tab:</p>
-                        <a href="{{ embed_url }}" target="_blank" class="open-stream-btn">Open Stream</a>
-                    {% endif %}
-                </div>
-            {% endif %}
-        {% else %}
-            <div class="no-stream">
-                <h2>No Stream Available</h2>
-                <p>Please check back later or select another stream.</p>
-            </div>
-        {% endif %}
-    </div>
-    
-    <div class="stream-selector">
-        <select id="stream-select" class="form-select">
+<div class="flex flex-col gap-4">
+    <!-- Stream Selector -->
+    <div class="bg-youtube-secondary rounded-lg p-4">
+        <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
             {% for stream in active_streams %}
                 <option value="{{ stream.channel_slug }}" {% if stream.channel_slug == current_stream %}selected{% endif %}>
                     {{ stream.channel_slug }} ({{ stream.get_platform_display }}){% if stream.is_featured %} [Featured]{% endif %}
@@ -42,96 +13,182 @@
             {% endfor %}
         </select>
     </div>
+
+    <div class="flex flex-col lg:flex-row gap-4">
+        <!-- Stream Container -->
+        <div class="flex-1">
+            <div class="bg-youtube-secondary rounded-lg overflow-hidden">
+                {% if embed_url %}
+                    <iframe 
+                        src="{{ embed_url }}" 
+                        class="w-full aspect-video"
+                        allowfullscreen
+                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                    ></iframe>
+                {% else %}
+                    <div class="p-4 text-center">
+                        <p class="text-youtube-primary">Stream is not available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="w-full lg:w-80">
+            <div class="bg-youtube-secondary rounded-lg h-[calc(100vh-12rem)] flex flex-col">
+                <!-- Chat Header -->
+                <div class="p-4 border-b border-youtube-primary">
+                    <h2 class="text-youtube-primary font-semibold">Chat</h2>
+                </div>
+
+                <!-- Chat Messages -->
+                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2">
+                    <!-- Messages will be inserted here -->
+                </div>
+
+                <!-- Chat Input -->
+                <div class="p-4 border-t border-youtube-primary">
+                    {% if user.is_authenticated %}
+                        <form id="chat-form" class="flex gap-2">
+                            <input 
+                                type="text" 
+                                id="chat-input" 
+                                class="flex-1 bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                                placeholder="Type a message..."
+                                maxlength="{{ CHAT_MESSAGE_MAX_LENGTH }}"
+                            >
+                            <button 
+                                type="submit"
+                                class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                            >
+                                Send
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="text-center">
+                            <a 
+                                href="{% url 'discord_login' %}?next=/watch/" 
+                                class="text-youtube-primary hover:text-youtube-secondary"
+                            >
+                                Login to chat
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+{% endblock %}
 
-<style>
-.stream-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 60px);
-    gap: 20px;
-    padding: 20px;
-}
-
-.stream-player {
-    flex: 1;
-    background: #1a1a1a;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.stream-selector {
-    padding: 10px;
-    background: #1a1a1a;
-    border-radius: 8px;
-}
-
-.form-select {
-    width: 100%;
-    padding: 8px;
-    background: #2a2a2a;
-    border: 1px solid #3a3a3a;
-    border-radius: 4px;
-    color: #fff;
-}
-
-.no-stream {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #666;
-    text-align: center;
-    padding: 20px;
-}
-
-.dev-note {
-    margin-top: 20px;
-    color: #888;
-    font-size: 0.9em;
-}
-
-.open-stream-btn {
-    display: inline-block;
-    margin-top: 10px;
-    padding: 10px 20px;
-    background: #2a2a2a;
-    color: #fff;
-    border-radius: 4px;
-    text-decoration: none;
-    transition: background 0.3s;
-}
-
-.open-stream-btn:hover {
-    background: #3a3a3a;
-}
-
-iframe {
-    border: none;
-}
-</style>
-
+{% block extra_js %}
 <script>
-document.getElementById('stream-select').addEventListener('change', function(e) {
-    const streamSlug = e.target.value;
-    const formData = new FormData();
-    formData.append('stream_slug', streamSlug);
-    
-    fetch('/switch-stream/', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    // Stream selection handling
+    document.getElementById('stream-select').addEventListener('change', function(e) {
+        const streamSlug = e.target.value;
+        const formData = new FormData();
+        formData.append('stream_slug', streamSlug);
+        
+        fetch('/switch-stream/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+
+    // Chat WebSocket handling
+    console.log('Initializing WebSocket connection...');
+    const chatSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/chat/'
+    );
+
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+
+    chatSocket.onopen = function(e) {
+        console.log('WebSocket connection established');
+    };
+
+    chatSocket.onclose = function(e) {
+        console.error('WebSocket connection closed:', e);
+    };
+
+    chatSocket.onerror = function(e) {
+        console.error('WebSocket error:', e);
+    };
+
+    chatSocket.onmessage = function(e) {
+        console.log('Received message:', e.data);
+        const data = JSON.parse(e.data);
+        
+        if (data.error) {
+            // Handle error message
+            console.error('Error from server:', data.error);
+            return;
         }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
+
+        if (data.history) {
+            // Handle chat history
+            console.log('Received chat history:', data.history);
+            data.history.forEach(message => {
+                appendMessage(message);
+            });
+            return;
         }
-    })
-    .catch(error => console.error('Error:', error));
-});
+
+        if (data.command === 'clear') {
+            // Clear chat
+            console.log('Clearing chat');
+            chatMessages.innerHTML = '';
+            return;
+        }
+
+        // Handle new message
+        console.log('Appending new message:', data);
+        appendMessage(data);
+    };
+
+    if (chatForm) {
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (message) {
+                console.log('Sending message:', message);
+                chatSocket.send(JSON.stringify({
+                    'message': message
+                }));
+                chatInput.value = '';
+            }
+        });
+    }
+
+    function appendMessage(data) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'flex items-start gap-2';
+        
+        const userDiv = document.createElement('div');
+        userDiv.className = 'font-semibold text-youtube-primary';
+        userDiv.textContent = data.user;
+        
+        const messageText = document.createElement('div');
+        messageText.className = 'text-youtube-secondary';
+        messageText.textContent = data.message;
+        
+        messageDiv.appendChild(userDiv);
+        messageDiv.appendChild(messageText);
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 </script>
 {% endblock %} 

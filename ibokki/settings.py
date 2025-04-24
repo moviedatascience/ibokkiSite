@@ -179,3 +179,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # YouTube API Settings
 YOUTUBE_API_KEY = os.getenv('YOUTUBE_API_KEY')
+
+# Channels settings
+ASGI_APPLICATION = "ibokki.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    },
+}
+
+# Chat settings
+CHAT_MESSAGE_MAX_LENGTH = 500
+CHAT_MESSAGE_RATE_LIMIT = 1  # seconds between messages
+CHAT_MESSAGE_HISTORY_LENGTH = 100  # number of messages to keep in history
