@@ -27,7 +27,7 @@ KICK_CLIENT_ID = os.getenv("KICK_CLIENT_ID")
 
 KICK_CLIENT_SECRET = os.getenv("KICK_CLIENT_SECRET")
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".ngrok-free.app"]
+ALLOWED_HOSTS = ["ibokki.com", "www.ibokki.com", "localhost", "127.0.0.1", ".ngrok-free.app"]
 
 
 # Application definition
@@ -119,11 +119,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Session settings
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
-SESSION_COOKIE_SECURE = False  # Set to True in production
+SESSION_COOKIE_SECURE = True  # Set to True in production
 SESSION_COOKIE_HTTPONLY = True
 SESSION_SAVE_EVERY_REQUEST = True
 
@@ -142,11 +143,12 @@ DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 
 # Handle admin IDs
 raw_admin_ids = os.getenv("DISCORD_ADMIN_IDS", "")
-print(f"\n=== Settings Debug ===")
-print(f"Raw DISCORD_ADMIN_IDS from env: {raw_admin_ids}")
-DISCORD_ADMIN_IDS = [id.strip().replace('discord_', '') for id in raw_admin_ids.split(",") if id.strip()]
-print(f"Processed DISCORD_ADMIN_IDS: {DISCORD_ADMIN_IDS}")
-print("=== End Settings Debug ===\n")
+if DEBUG:
+    print(f"\n=== Settings Debug ===")
+    print(f"Raw DISCORD_ADMIN_IDS from env: {raw_admin_ids}")
+    DISCORD_ADMIN_IDS = [id.strip().replace('discord_', '') for id in raw_admin_ids.split(",") if id.strip()]
+    print(f"Processed DISCORD_ADMIN_IDS: {DISCORD_ADMIN_IDS}")
+    print("=== End Settings Debug ===\n")
 
 # Environment settings
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # 'local' or 'production'
@@ -163,10 +165,12 @@ if ENVIRONMENT == "production":
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
 else:
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
+    SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
 
 # Append slash settings
 APPEND_SLASH = True
@@ -188,6 +192,7 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer"
     },
 }
+
 
 # Chat settings
 CHAT_MESSAGE_MAX_LENGTH = 500
