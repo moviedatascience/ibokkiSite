@@ -19,12 +19,27 @@
         <div class="flex-1">
             <div class="bg-youtube-secondary rounded-lg overflow-hidden">
                 {% if embed_url %}
-                    <iframe 
-                        src="{{ embed_url }}" 
-                        class="w-full aspect-video"
-                        allowfullscreen
-                        sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                    ></iframe>
+                    {% if current_stream.platform == 'youtube' and not embed_url %}
+                        <!-- Custom YouTube Offline Screen -->
+                        <div class="flex flex-col items-center justify-center p-8 text-center h-[56.25vw] max-h-[calc(100vh-12rem)]">
+                            <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain">
+                            <div class="flex gap-4 mt-4">
+                                <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank" class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">
+                                    Visit Channel
+                                </a>
+                                <button onclick="window.location.reload()" class="bg-youtube-primary text-youtube-secondary px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                    {% else %}
+                        <iframe 
+                            src="{{ embed_url }}" 
+                            class="w-full aspect-video"
+                            allowfullscreen
+                            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                        ></iframe>
+                    {% endif %}
                 {% else %}
                     <div class="p-4 text-center">
                         <p class="text-youtube-primary">Stream is not available</p>
