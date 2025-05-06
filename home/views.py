@@ -8,7 +8,7 @@ from django.contrib.auth.decorators import login_required
 from .kick_api import get_channel_info
 from .models import StreamSettings
 from django.contrib import messages
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from django.http import HttpResponseBadRequest, JsonResponse
 import logging
 
@@ -59,11 +59,11 @@ def discord_login(request):
         'debug_mode': settings.DEBUG
     })
     
-    # Build the Discord OAuth2 URL
+    # Build the Discord OAuth2 URL with proper URL encoding
     oauth_url = (
         'https://discord.com/api/oauth2/authorize'
         f'?client_id={settings.DISCORD_CLIENT_ID}'
-        f'&redirect_uri={settings.DISCORD_REDIRECT_URI}'
+        f'&redirect_uri={quote(settings.DISCORD_REDIRECT_URI, safe="")}'
         '&response_type=code'
         '&scope=identify email'
     )

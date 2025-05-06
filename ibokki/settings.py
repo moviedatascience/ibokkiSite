@@ -153,7 +153,10 @@ if DEBUG:
 # Environment settings
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # 'local' or 'production'
 BASE_URL = "http://localhost:8000" if ENVIRONMENT == "local" else os.getenv("BASE_URL", "https://your-production-domain.com")
-DISCORD_REDIRECT_URI = f"{BASE_URL}/discord/callback"
+# Ensure BASE_URL doesn't end with a slash
+BASE_URL = BASE_URL.rstrip('/')
+# Construct redirect URI with trailing slash to match URL pattern
+DISCORD_REDIRECT_URI = f"{BASE_URL}/discord/callback/"
 
 # Auth settings
 LOGIN_URL = "/discord/login/"  # Use relative URL
