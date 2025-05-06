@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
 import json
+from django.utils import timezone
 
 class CustomUser(AbstractUser):
     display_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
@@ -118,7 +119,8 @@ class StreamSettings(models.Model):
             if live_stream_id:
                 # Add origin parameter for local development
                 origin = 'http://localhost:8000' if settings.ENVIRONMENT == 'local' else settings.BASE_URL
-                return f"https://www.youtube.com/embed/{live_stream_id}?origin={origin}"
+                return f"https://www.youtube.com/embed/live_stream?channel={self.youtube_channel_id}&origin={origin}"
+            # If no live stream, return None to trigger offline screen
             return None
         elif self.platform == 'twitch':
             # Use the parent domain from settings
@@ -127,3 +129,19 @@ class StreamSettings(models.Model):
 
     def __str__(self):
         return f"{self.channel_slug} ({self.get_platform_display()}) [Featured: {self.is_featured}, Active: {self.is_active}]"
+
+class ChatMessage(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    message = models.TextField()
+    timestamp = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.user.display_name or self.user.username}: {self.message[:30]}"
+
+class Emote(models.Model):
+    code = models.CharField(max_length=32, unique=True, help_text="Emote code, e.g. :OMEGALUL:")
+    image = models.ImageField(upload_to="emotes/")
+    is_animated = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.code
