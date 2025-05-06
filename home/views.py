@@ -189,7 +189,7 @@ def profile_view(request):
 @login_required
 def watch(request):
     # Get the featured stream (default)
-    featured_stream = StreamSettings.objects.filter(is_featured=True).first()
+    featured_stream = StreamSettings.objects.filter(is_featured=True, is_active=True).first()
     
     # Get all active streams
     active_streams = StreamSettings.objects.filter(is_active=True)
@@ -197,18 +197,22 @@ def watch(request):
     # Get the selected stream from session or use featured
     selected_stream = request.session.get('selected_stream')
     if selected_stream:
-        stream = StreamSettings.objects.filter(channel_slug=selected_stream).first()
-        if not stream or not stream.is_active:
+        stream = StreamSettings.objects.filter(channel_slug=selected_stream, is_active=True).first()
+        if not stream:
             stream = featured_stream
     else:
         stream = featured_stream
+    
+    # If no stream is available, redirect to landing page
+    if not stream and not active_streams.exists():
+        return redirect('landing')
     
     context = {
         'stream_title': stream.channel_slug if stream else 'No Stream Available',
         'channel_slug': stream.channel_slug if stream else None,
         'embed_url': stream.get_embed_url() if stream else None,
         'active_streams': active_streams,
-        'current_stream': stream.channel_slug if stream else None,
+        'current_stream': stream,  # Pass the entire stream object
     }
     return render(request, 'home/watch.html', context)
 
