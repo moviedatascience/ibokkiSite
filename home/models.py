@@ -119,7 +119,7 @@ class StreamSettings(models.Model):
             if live_stream_id:
                 # Add origin parameter for local development
                 origin = 'http://localhost:8000' if settings.ENVIRONMENT == 'local' else settings.BASE_URL
-                return f"https://www.youtube.com/embed/live_stream?channel={self.youtube_channel_id}&origin={origin}"
+                return f"https://www.youtube.com/embed/{live_stream_id}?origin={origin}"
             # If no live stream, return None to trigger offline screen
             return None
         elif self.platform == 'twitch':
