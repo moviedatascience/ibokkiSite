@@ -10,6 +10,9 @@ from .models import StreamSettings
 from django.contrib import messages
 from urllib.parse import urlparse
 from django.http import HttpResponseBadRequest, JsonResponse
+import logging
+
+logger = logging.getLogger(__name__)
 
 def landing_page(request):
     """Landing page view"""
@@ -48,6 +51,14 @@ def discord_login(request):
     # Store the next URL in the session
     request.session['next'] = next_url
     
+    # Debug logging
+    logger.debug("Discord OAuth Debug", extra={
+        'base_url': settings.BASE_URL,
+        'redirect_uri': settings.DISCORD_REDIRECT_URI,
+        'environment': settings.ENVIRONMENT,
+        'debug_mode': settings.DEBUG
+    })
+    
     # Build the Discord OAuth2 URL
     oauth_url = (
         'https://discord.com/api/oauth2/authorize'
@@ -56,6 +67,7 @@ def discord_login(request):
         '&response_type=code'
         '&scope=identify email'
     )
+    logger.debug(f"Full OAuth URL: {oauth_url}")
     
     return redirect(oauth_url)
 
@@ -66,6 +78,13 @@ def discord_callback(request):
     
     # Get the redirect URI from settings
     redirect_uri = settings.DISCORD_REDIRECT_URI
+    
+    # Debug logging
+    logger.debug("Discord Callback Debug", extra={
+        'code': code,
+        'redirect_uri': redirect_uri,
+        'request_params': dict(request.GET)
+    })
     
     # Exchange code for token
     data = {
@@ -79,6 +98,11 @@ def discord_callback(request):
     try:
         # Get access token
         token_response = requests.post('https://discord.com/api/oauth2/token', data=data)
+        logger.debug("Token response", extra={
+            'status_code': token_response.status_code,
+            'response_body': token_response.text
+        })
+        
         token_response.raise_for_status()
         token_data = token_response.json()
         access_token = token_data['access_token']
@@ -127,10 +151,15 @@ def discord_callback(request):
         if not next_url.startswith('http'):
             next_url = f"{settings.BASE_URL}{next_url}"
         
+        logger.debug(f"Redirecting to: {next_url}")
+        
         return redirect(next_url)
         
     except requests.RequestException as e:
-        print(f"Error during Discord authentication: {str(e)}")
+        logger.error("Discord authentication error", extra={
+            'error': str(e),
+            'response_content': e.response.text if hasattr(e, 'response') else 'No response content'
+        })
         return HttpResponseBadRequest("Failed to authenticate with Discord")
 
 @login_required
