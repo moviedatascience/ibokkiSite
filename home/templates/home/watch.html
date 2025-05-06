@@ -89,6 +89,10 @@
         const formData = new FormData();
         formData.append('stream_slug', streamSlug);
         
+        // Disable the select while switching
+        const select = e.target;
+        select.disabled = true;
+        
         fetch('/switch-stream/', {
             method: 'POST',
             body: formData,
@@ -99,10 +103,26 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                window.location.reload();
+                // Update the iframe src directly
+                const iframe = document.querySelector('iframe');
+                if (iframe) {
+                    iframe.src = data.embed_url;
+                }
+            } else {
+                console.error('Failed to switch stream:', data.error);
+                // Revert the select to the previous value
+                select.value = '{{ current_stream }}';
             }
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => {
+            console.error('Error:', error);
+            // Revert the select to the previous value
+            select.value = '{{ current_stream }}';
+        })
+        .finally(() => {
+            // Re-enable the select
+            select.disabled = false;
+        });
     });
 
     // Chat WebSocket handling
@@ -182,7 +202,7 @@
         
         const messageText = document.createElement('div');
         messageText.className = 'text-youtube-secondary';
-        messageText.textContent = data.message;
+        messageText.innerHTML = data.message;
         
         messageDiv.appendChild(userDiv);
         messageDiv.appendChild(messageText);

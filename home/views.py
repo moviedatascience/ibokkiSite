@@ -219,5 +219,9 @@ def switch_stream(request):
             stream = StreamSettings.objects.filter(channel_slug=stream_slug, is_active=True).first()
             if stream:
                 request.session['selected_stream'] = stream_slug
-                return JsonResponse({'success': True, 'channel_slug': stream_slug})
+                return JsonResponse({
+                    'success': True, 
+                    'channel_slug': stream_slug,
+                    'embed_url': stream.get_embed_url()
+                })
     return JsonResponse({'success': False, 'error': 'Invalid request'})
