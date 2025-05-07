@@ -2,21 +2,21 @@
 {% load static %}
 
 {% block content %}
-<div class="flex flex-col lg:flex-row h-[calc(100vh-5rem)] w-screen">
+<div class="flex flex-col lg:flex-row h-screen w-screen overflow-hidden">
     <!-- Stream Container -->
     <div class="flex-1 flex items-center justify-center bg-black min-w-0">
-        <div class="w-full max-w-5xl mx-auto">
-            <div class="bg-youtube-secondary rounded-lg overflow-hidden w-full">
+        <div class="w-full max-w-5xl aspect-video">
+            <div class="bg-youtube-secondary rounded-none w-full h-full">
                 {% if embed_url %}
                     <iframe 
                         src="{{ embed_url }}" 
-                        class="w-full aspect-video"
+                        class="w-full h-full aspect-video"
                         allowfullscreen
                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                     ></iframe>
                 {% elif current_stream.platform == 'youtube' %}
                     <!-- Custom YouTube Offline Screen -->
-                    <div class="flex flex-col items-center justify-center p-8 text-center h-[56.25vw] max-h-[calc(100vh-12rem)]">
+                    <div class="flex flex-col items-center justify-center p-8 text-center h-full">
                         <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain">
                         <div class="flex gap-4 mt-4">
                             <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank" class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">
@@ -28,8 +28,8 @@
                         </div>
                     </div>
                 {% else %}
-                    <div class="p-4 text-center">
-                        <p class="text-youtube-primary">Stream is not available</p>
+                    <div class="p-4 text-center text-youtube-primary">
+                        Stream is not available
                     </div>
                 {% endif %}
             </div>
@@ -37,7 +37,7 @@
     </div>
 
     <!-- Chat Container -->
-    <div class="w-full lg:w-96 flex flex-col h-[60vh] lg:h-full bg-youtube-secondary rounded-l-lg">
+    <div class="w-full lg:w-96 flex flex-col h-1/2 lg:h-full bg-youtube-secondary border-l border-youtube-primary">
         <!-- Stream Selector Dropdown at top of chat -->
         <div class="p-4 border-b border-youtube-primary bg-youtube-secondary">
             <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
@@ -96,9 +96,10 @@
         const streamSlug = e.target.value;
         const formData = new FormData();
         formData.append('stream_slug', streamSlug);
-        // Disable the select while switching
+
         const select = e.target;
         select.disabled = true;
+
         fetch('/switch-stream/', {
             method: 'POST',
             body: formData,
@@ -109,78 +110,41 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Update the iframe src directly
                 const iframe = document.querySelector('iframe');
                 if (iframe) {
                     iframe.src = data.embed_url;
                 }
             } else {
                 console.error('Failed to switch stream:', data.error);
-                // Revert the select to the previous value
                 select.value = '{{ current_stream }}';
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            // Revert the select to the previous value
             select.value = '{{ current_stream }}';
         })
         .finally(() => {
-            // Re-enable the select
             select.disabled = false;
         });
     });
 
     // Chat WebSocket handling
-    console.log('Initializing WebSocket connection...');
-    const chatSocket = new WebSocket(
-        'ws://' + window.location.host + '/ws/chat/'
-    );
-
+    const chatSocket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
 
-    chatSocket.onopen = function(e) {
-        console.log('WebSocket connection established');
-    };
-
-    chatSocket.onclose = function(e) {
-        console.error('WebSocket connection closed:', e);
-    };
-
-    chatSocket.onerror = function(e) {
-        console.error('WebSocket error:', e);
-    };
-
     chatSocket.onmessage = function(e) {
-        console.log('Received message:', e.data);
         const data = JSON.parse(e.data);
-        
-        if (data.error) {
-            // Handle error message
-            console.error('Error from server:', data.error);
-            return;
-        }
-
+        if (data.error) return console.error('Server error:', data.error);
         if (data.history) {
-            // Handle chat history
-            console.log('Received chat history:', data.history);
-            data.history.forEach(message => {
-                appendMessage(message);
-            });
+            data.history.forEach(appendMessage);
             return;
         }
-
         if (data.command === 'clear') {
-            // Clear chat
-            console.log('Clearing chat');
             chatMessages.innerHTML = '';
             return;
         }
-
-        // Handle new message
-        console.log('Appending new message:', data);
         appendMessage(data);
     };
 
@@ -189,10 +153,7 @@
             e.preventDefault();
             const message = chatInput.value.trim();
             if (message) {
-                console.log('Sending message:', message);
-                chatSocket.send(JSON.stringify({
-                    'message': message
-                }));
+                chatSocket.send(JSON.stringify({ 'message': message }));
                 chatInput.value = '';
             }
         });
@@ -201,20 +162,20 @@
     function appendMessage(data) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'flex items-start gap-2';
-        
+
         const userDiv = document.createElement('div');
         userDiv.className = 'font-semibold text-youtube-primary';
         userDiv.textContent = data.user;
-        
+
         const messageText = document.createElement('div');
         messageText.className = 'text-youtube-secondary';
         messageText.innerHTML = data.message;
-        
+
         messageDiv.appendChild(userDiv);
         messageDiv.appendChild(messageText);
-        
+
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 </script>
-{% endblock %} 
+{% endblock %}
