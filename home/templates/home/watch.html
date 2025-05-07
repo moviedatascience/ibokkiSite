@@ -2,22 +2,11 @@
 {% load static %}
 
 {% block content %}
-<div class="flex flex-col gap-4">
-    <!-- Stream Selector -->
-    <div class="bg-youtube-secondary rounded-lg p-4">
-        <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-            {% for stream in active_streams %}
-                <option value="{{ stream.channel_slug }}" {% if stream.channel_slug == current_stream %}selected{% endif %}>
-                    {{ stream.channel_slug }} ({{ stream.get_platform_display }}){% if stream.is_featured %} [Featured]{% endif %}
-                </option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="flex flex-col lg:flex-row gap-4">
-        <!-- Stream Container -->
-        <div class="flex-1">
-            <div class="bg-youtube-secondary rounded-lg overflow-hidden">
+<div class="flex flex-row h-[calc(100vh-5rem)] w-full">
+    <!-- Stream Container -->
+    <div class="flex-1 flex items-center justify-center min-w-0">
+        <div class="w-full h-full flex items-center justify-center">
+            <div class="bg-youtube-secondary rounded-lg overflow-hidden w-full">
                 {% if embed_url %}
                     <iframe 
                         src="{{ embed_url }}" 
@@ -45,50 +34,56 @@
                 {% endif %}
             </div>
         </div>
+    </div>
 
-        <!-- Chat Container -->
-        <div class="w-full lg:w-80">
-            <div class="bg-youtube-secondary rounded-lg h-[calc(100vh-12rem)] flex flex-col">
-                <!-- Chat Header -->
-                <div class="p-4 border-b border-youtube-primary">
-                    <h2 class="text-youtube-primary font-semibold">Chat</h2>
+    <!-- Chat Container -->
+    <div class="w-full max-w-md flex flex-col h-full bg-youtube-secondary rounded-l-lg">
+        <!-- Stream Selector Dropdown at top of chat -->
+        <div class="p-4 border-b border-youtube-primary bg-youtube-secondary">
+            <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                {% for stream in active_streams %}
+                    <option value="{{ stream.channel_slug }}" {% if stream.channel_slug == current_stream %}selected{% endif %}>
+                        {{ stream.channel_slug }} ({{ stream.get_platform_display }}){% if stream.is_featured %} [Featured]{% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Chat Header -->
+        <div class="p-4 border-b border-youtube-primary">
+            <h2 class="text-youtube-primary font-semibold">Chat</h2>
+        </div>
+        <!-- Chat Messages -->
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2">
+            <!-- Messages will be inserted here -->
+        </div>
+        <!-- Chat Input -->
+        <div class="p-4 border-t border-youtube-primary">
+            {% if user.is_authenticated %}
+                <form id="chat-form" class="flex gap-2">
+                    <input 
+                        type="text" 
+                        id="chat-input" 
+                        class="flex-1 bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                        placeholder="Type a message..."
+                        maxlength="{{ CHAT_MESSAGE_MAX_LENGTH }}"
+                    >
+                    <button 
+                        type="submit"
+                        class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
+                    >
+                        Send
+                    </button>
+                </form>
+            {% else %}
+                <div class="text-center">
+                    <a 
+                        href="{% url 'discord_login' %}?next=/watch/" 
+                        class="text-youtube-primary hover:text-youtube-secondary"
+                    >
+                        Login to chat
+                    </a>
                 </div>
-
-                <!-- Chat Messages -->
-                <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2">
-                    <!-- Messages will be inserted here -->
-                </div>
-
-                <!-- Chat Input -->
-                <div class="p-4 border-t border-youtube-primary">
-                    {% if user.is_authenticated %}
-                        <form id="chat-form" class="flex gap-2">
-                            <input 
-                                type="text" 
-                                id="chat-input" 
-                                class="flex-1 bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                                placeholder="Type a message..."
-                                maxlength="{{ CHAT_MESSAGE_MAX_LENGTH }}"
-                            >
-                            <button 
-                                type="submit"
-                                class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                            >
-                                Send
-                            </button>
-                        </form>
-                    {% else %}
-                        <div class="text-center">
-                            <a 
-                                href="{% url 'discord_login' %}?next=/watch/" 
-                                class="text-youtube-primary hover:text-youtube-secondary"
-                            >
-                                Login to chat
-                            </a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -101,11 +96,9 @@
         const streamSlug = e.target.value;
         const formData = new FormData();
         formData.append('stream_slug', streamSlug);
-        
         // Disable the select while switching
         const select = e.target;
         select.disabled = true;
-        
         fetch('/switch-stream/', {
             method: 'POST',
             body: formData,
