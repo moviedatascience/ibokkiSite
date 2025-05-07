@@ -41,12 +41,15 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "home.apps.HomeConfig",
     "csp",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -122,6 +125,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Session settings
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
@@ -169,6 +173,9 @@ SECURE_SSL_REDIRECT = False
 CSRF_COOKIE_SECURE = False
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
+CSRF_TRUSTED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
+CORS_ALLOWED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
+CORS_ALLOW_CREDENTIALS = True
 
 # Append slash settings
 APPEND_SLASH = True
