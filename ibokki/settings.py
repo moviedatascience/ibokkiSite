@@ -248,6 +248,8 @@ CSP_FRAME_SRC = (
     "https://*.youtube.com",
     "https://*.twitch.tv",
     "https://*.kick.com",
+    "https://kick.com",
+    "https://player.kick.com",
     "https://*.rumble.com",
     "https://*.bitchute.com",
     "https://*.odysee.com",
