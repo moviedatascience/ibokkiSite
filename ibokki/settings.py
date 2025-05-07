@@ -40,9 +40,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "home.apps.HomeConfig",
+    "csp",
 ]
 
 MIDDLEWARE = [
+    "csp.middleware.CSPMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -235,3 +237,27 @@ LOGGING = {
         },
     },
 }
+
+# Content Security Policy settings
+CSP_DEFAULT_SRC = ("'self'", "https:")
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https:")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https:")
+CSP_IMG_SRC = ("'self'", "data:", "https:")
+CSP_FRAME_SRC = (
+    "'self'",
+    "https://*.youtube.com",
+    "https://*.twitch.tv",
+    "https://*.kick.com",
+    "https://*.rumble.com",
+    "https://*.bitchute.com",
+    "https://*.odysee.com",
+    "https://*.vimeo.com",
+    "https://*.dailymotion.com",
+)
+CSP_CONNECT_SRC = ("'self'", "https:", "wss:")
+CSP_FONT_SRC = ("'self'", "https:", "data:")
+
+# Enable CSP reporting in production
+if not DEBUG:
+    CSP_REPORT_ONLY = False
+    CSP_REPORT_URI = '/csp-report/'
