@@ -3,21 +3,20 @@
 
 {% block content %}
 <div class="flex flex-col lg:flex-row h-screen w-screen overflow-hidden">
-    <!-- Stream Container -->
-    <div class="flex-1 bg-black flex items-center justify-center min-w-0">
+    <!-- STREAM AREA -->
+    <div class="flex-grow flex justify-center items-center bg-black overflow-hidden">
         {% if embed_url %}
-            <div class="w-full h-full flex items-center justify-center">
+            <div class="w-full max-w-[calc(100vw-24rem)] aspect-[16/9]">
                 <iframe 
                     src="{{ embed_url }}" 
-                    class="w-full h-full object-contain"
+                    class="w-full h-full rounded-none border-none"
                     allowfullscreen
                     sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                 ></iframe>
             </div>
         {% elif current_stream.platform == 'youtube' %}
-            <!-- YouTube Offline Screen -->
-            <div class="flex flex-col items-center justify-center w-full h-full p-4 text-center">
-                <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain">
+            <div class="w-full max-w-[calc(100vw-24rem)] aspect-[16/9] flex flex-col items-center justify-center text-center p-4">
+                <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
                 <div class="flex gap-4 mt-4">
                     <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank" class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">
                         Visit Channel
@@ -28,15 +27,13 @@
                 </div>
             </div>
         {% else %}
-            <div class="p-4 text-center text-youtube-primary">
-                Stream is not available
-            </div>
+            <div class="text-youtube-primary text-center p-4">Stream is not available</div>
         {% endif %}
     </div>
 
-    <!-- Chat Container -->
-    <div class="w-full lg:w-96 flex flex-col h-1/2 lg:h-full bg-youtube-secondary border-l border-youtube-primary">
-        <!-- Stream Selector -->
+    <!-- CHAT SIDEBAR -->
+    <div class="w-full lg:w-96 h-1/2 lg:h-full bg-youtube-secondary flex flex-col border-t lg:border-t-0 lg:border-l border-youtube-primary">
+        <!-- Dropdown -->
         <div class="p-4 border-b border-youtube-primary bg-youtube-secondary">
             <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
                 {% for stream in active_streams %}
@@ -46,15 +43,15 @@
                 {% endfor %}
             </select>
         </div>
-        <!-- Chat Header -->
+        <!-- Header -->
         <div class="p-4 border-b border-youtube-primary">
             <h2 class="text-youtube-primary font-semibold">Chat</h2>
         </div>
-        <!-- Chat Messages -->
+        <!-- Chat messages -->
         <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2">
             <!-- Messages inserted here -->
         </div>
-        <!-- Chat Input -->
+        <!-- Input -->
         <div class="p-4 border-t border-youtube-primary">
             {% if user.is_authenticated %}
                 <form id="chat-form" class="flex gap-2">
@@ -85,4 +82,88 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Stream switcher
+    document.getElementById('stream-select').addEventListener('change', function(e) {
+        const streamSlug = e.target.value;
+        const formData = new FormData();
+        formData.append('stream_slug', streamSlug);
+
+        const select = e.target;
+        select.disabled = true;
+
+        fetch('/switch-stream/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const iframe = document.querySelector('iframe');
+                if (iframe) {
+                    iframe.src = data.embed_url;
+                }
+            } else {
+                console.error('Failed to switch stream:', data.error);
+                select.value = '{{ current_stream }}';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            select.value = '{{ current_stream }}';
+        })
+        .finally(() => {
+            select.disabled = false;
+        });
+    });
+
+    // WebSocket logic
+    const chatSocket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.error) return;
+        if (data.history) return data.history.forEach(appendMessage);
+        if (data.command === 'clear') return chatMessages.innerHTML = '';
+        appendMessage(data);
+    };
+
+    if (chatForm) {
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (message) {
+                chatSocket.send(JSON.stringify({ message }));
+                chatInput.value = '';
+            }
+        });
+    }
+
+    function appendMessage(data) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'flex items-start gap-2';
+
+        const userDiv = document.createElement('div');
+        userDiv.className = 'font-semibold text-youtube-primary';
+        userDiv.textContent = data.user;
+
+        const msgText = document.createElement('div');
+        msgText.className = 'text-youtube-secondary';
+        msgText.innerHTML = data.message;
+
+        msgDiv.appendChild(userDiv);
+        msgDiv.appendChild(msgText);
+        chatMessages.appendChild(msgDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+</script>
 {% endblock %}
