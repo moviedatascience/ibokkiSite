@@ -6,12 +6,14 @@
     <!-- Stream Container -->
     <div class="flex-1 bg-black flex items-center justify-center min-w-0">
         {% if embed_url %}
-            <iframe 
-                src="{{ embed_url }}" 
-                class="w-full h-full aspect-video"
-                allowfullscreen
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            ></iframe>
+            <div class="w-full h-full flex items-center justify-center">
+                <iframe 
+                    src="{{ embed_url }}" 
+                    class="w-full h-full object-contain"
+                    allowfullscreen
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                ></iframe>
+            </div>
         {% elif current_stream.platform == 'youtube' %}
             <!-- YouTube Offline Screen -->
             <div class="flex flex-col items-center justify-center w-full h-full p-4 text-center">
