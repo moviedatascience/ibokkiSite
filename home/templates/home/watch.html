@@ -2,16 +2,18 @@
 {% load static %}
 
 {% block content %}
-<div class="flex h-screen w-screen overflow-hidden">
+<div class="flex h-screen overflow-hidden">
     <!-- STREAM AREA -->
-    <div class="flex-grow bg-black flex items-center justify-center">
+    <div class="flex-grow flex items-center justify-center bg-black">
         {% if embed_url %}
-            <iframe 
-                src="{{ embed_url }}" 
-                class="w-full h-full"
-                allowfullscreen
-                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-            ></iframe>
+            <div class="w-full h-full">
+                <iframe 
+                    src="{{ embed_url }}" 
+                    class="w-full h-full" 
+                    allowfullscreen
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                ></iframe>
+            </div>
         {% elif current_stream.platform == 'youtube' %}
             <div class="w-full h-full flex flex-col items-center justify-center text-center p-4">
                 <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
@@ -30,7 +32,7 @@
     </div>
 
     <!-- CHAT SIDEBAR -->
-    <div class="w-96 h-full bg-youtube-secondary flex flex-col border-l border-youtube-primary">
+    <div class="w-[24rem] flex flex-col bg-youtube-secondary border-l border-youtube-primary">
         <!-- Dropdown -->
         <div class="p-4 border-b border-youtube-primary bg-youtube-secondary">
             <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
@@ -45,7 +47,7 @@
         <div class="p-4 border-b border-youtube-primary">
             <h2 class="text-youtube-primary font-semibold">Chat</h2>
         </div>
-        <!-- Chat messages -->
+        <!-- Chat Messages -->
         <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2">
             <!-- Messages inserted here -->
         </div>
@@ -84,13 +86,11 @@
 
 {% block extra_js %}
 <script>
+    // Stream switcher
     document.getElementById('stream-select').addEventListener('change', function(e) {
         const streamSlug = e.target.value;
         const formData = new FormData();
         formData.append('stream_slug', streamSlug);
-
-        const select = e.target;
-        select.disabled = true;
 
         fetch('/switch-stream/', {
             method: 'POST',
@@ -105,19 +105,13 @@
                 const iframe = document.querySelector('iframe');
                 if (iframe) iframe.src = data.embed_url;
             } else {
-                console.error('Failed to switch stream:', data.error);
-                select.value = '{{ current_stream }}';
+                console.error('Stream switch error:', data.error);
             }
         })
-        .catch(error => {
-            console.error('Error:', error);
-            select.value = '{{ current_stream }}';
-        })
-        .finally(() => {
-            select.disabled = false;
-        });
+        .catch(err => console.error('Request failed:', err));
     });
 
+    // WebSocket chat
     const chatSocket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
