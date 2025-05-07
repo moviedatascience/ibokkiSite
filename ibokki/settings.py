@@ -168,6 +168,7 @@ LOGIN_REDIRECT_URL = "/watch/"  # Use relative URL
 SECURE_SSL_REDIRECT = False
 CSRF_COOKIE_SECURE = False
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
 
 # Append slash settings
 APPEND_SLASH = True
