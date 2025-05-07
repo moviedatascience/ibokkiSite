@@ -4,13 +4,13 @@
 {% block content %}
 <div class="flex flex-col lg:flex-row h-[calc(100vh-5rem)] w-screen">
     <!-- Stream Container -->
-    <div class="flex-1 min-w-0 flex items-center justify-center lg:items-stretch lg:justify-stretch">
-        <div class="w-full h-full">
-            <div class="bg-youtube-secondary rounded-lg overflow-hidden w-full h-full flex items-center justify-center">
+    <div class="flex-1 flex items-center justify-center bg-black min-w-0">
+        <div class="w-full max-w-5xl mx-auto">
+            <div class="bg-youtube-secondary rounded-lg overflow-hidden w-full">
                 {% if embed_url %}
                     <iframe 
                         src="{{ embed_url }}" 
-                        class="w-full aspect-video max-h-full"
+                        class="w-full aspect-video"
                         allowfullscreen
                         sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                     ></iframe>
