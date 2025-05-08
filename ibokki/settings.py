@@ -175,6 +175,10 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
+# Add these settings for Cloudflare
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 CSRF_TRUSTED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
 CORS_ALLOWED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
 CORS_ALLOW_CREDENTIALS = True
