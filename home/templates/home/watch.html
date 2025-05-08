@@ -13,22 +13,26 @@
 <div class="flex flex-col flex-grow h-full">
 
     <!-- NAVIGATION -->
-    <nav class="h-[3.5rem] bg-youtube-nav text-youtube-primary flex justify-between items-center px-4 shrink-0 z-40">
+    <nav id="main-nav" class="h-[3.5rem] bg-youtube-nav text-youtube-primary flex justify-between items-center px-4 shrink-0 z-40">
         <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
         <div>
             {% if user.is_authenticated %}
-                <button id="profileDropdownBtn" class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none">
-                    <i class="fas fa-user text-youtube-primary"></i>
-                </button>
-                <div id="profileDropdown" class="dropdown-menu">
-                    <a href="{% url 'profile' %}" class="dropdown-item"><i class="fas fa-user-circle mr-2"></i> Profile</a>
-                    <div class="dropdown-divider"></div>
-                    <form action="{% url 'logout' %}" method="post" class="inline">
-                        {% csrf_token %}
-                        <button type="submit" class="dropdown-item w-full text-left">
-                            <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                        </button>
-                    </form>
+                <div class="relative">
+                    <button id="profileDropdownBtn" class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none">
+                        <i class="fas fa-user text-youtube-primary"></i>
+                    </button>
+                    <div id="profileDropdown" class="dropdown-menu">
+                        <a href="{% url 'profile' %}" class="dropdown-item">
+                            <i class="fas fa-user-circle mr-2"></i> Profile
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <form action="{% url 'logout' %}" method="post" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item w-full text-left">
+                                <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                            </button>
+                        </form>
+                    </div>
                 </div>
             {% else %}
                 <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">Login with Discord</a>
@@ -39,14 +43,12 @@
     <!-- Stream Area -->
     <div class="flex-grow bg-black">
         {% if embed_url %}
-            <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen
-                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+            <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
         {% elif current_stream.platform == 'youtube' %}
             <div class="h-full w-full flex flex-col items-center justify-center text-center p-4">
                 <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
                 <div class="flex gap-4 mt-4">
-                    <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank"
-                       class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">Visit Channel</a>
+                    <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank" class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">Visit Channel</a>
                     <button onclick="window.location.reload()" class="bg-youtube-primary text-youtube-secondary px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">Refresh</button>
                 </div>
             </div>
@@ -65,33 +67,34 @@
 {% block extra_js %}
 <script>
     // Toggle chat side
-    const btn = document.getElementById('chat-side-toggle');
+    const chatToggleBtn = document.getElementById('chat-side-toggle');
     const chatLeft = document.getElementById('chat-left');
     const chatRight = document.getElementById('chat-right');
 
     function toggleChatSide() {
-        if (chatRight.classList.contains('hidden')) {
-            chatRight.classList.remove('hidden');
-            chatLeft.classList.add('hidden');
-        } else {
+        if (chatRight && !chatRight.classList.contains('hidden')) {
             chatRight.classList.add('hidden');
             chatLeft.classList.remove('hidden');
+        } else {
+            chatLeft.classList.add('hidden');
+            chatRight.classList.remove('hidden');
         }
     }
 
-    if (btn) {
-        btn.addEventListener('click', toggleChatSide);
+    if (chatToggleBtn) {
+        chatToggleBtn.addEventListener('click', toggleChatSide);
     }
 
-    // Profile dropdown
+    // Profile dropdown logic
     const dropdownBtn = document.getElementById('profileDropdownBtn');
     const dropdownMenu = document.getElementById('profileDropdown');
+
     if (dropdownBtn && dropdownMenu) {
-        dropdownBtn.addEventListener('click', e => {
+        dropdownBtn.addEventListener('click', function(e) {
             e.stopPropagation();
             dropdownMenu.classList.toggle('show');
         });
-        document.addEventListener('click', e => {
+        document.addEventListener('click', function(e) {
             if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
                 dropdownMenu.classList.remove('show');
             }
