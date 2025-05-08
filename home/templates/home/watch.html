@@ -14,7 +14,9 @@
     <div id="stream-area" class="flex-grow h-full flex flex-col min-h-0 min-w-0">
         <div class="flex-grow bg-black min-h-0 min-w-0 flex items-center justify-center">
             {% if embed_url %}
-                <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+                <div style="aspect-ratio: 16/9; height: 100%; width: auto; display: flex;">
+                    <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+                </div>
             {% elif current_stream.platform == 'youtube' %}
                 <div class="h-full w-full flex flex-col items-center justify-center text-center p-4">
                     <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
