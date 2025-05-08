@@ -1,179 +1,101 @@
 {% extends "home/base.html" %}
 {% load static %}
 
-{% block main_classes %}p-0{% endblock %}
+{% block main_classes %}p-0 h-screen w-screen overflow-hidden flex{% endblock %}
 
 {% block content %}
-<div id="watch-wrapper" class="relative h-screen w-screen overflow-hidden">
+<!-- Left Chat Panel -->
+<div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-r border-youtube-primary">
+    {% include "home/chat_panel.html" %}
+</div>
 
-    <!-- STREAM AREA -->
-    <div id="stream-pane" class="absolute inset-0 bg-black">
-        <div class="h-full w-full">
-            {% if embed_url %}
-                <iframe 
-                    src="{{ embed_url }}" 
-                    class="h-full w-full"
-                    allowfullscreen
-                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                ></iframe>
-            {% elif current_stream.platform == 'youtube' %}
-                <div class="h-full w-full flex flex-col items-center justify-center text-center p-4">
-                    <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
-                    <div class="flex gap-4 mt-4">
-                        <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank" class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">
-                            Visit Channel
-                        </a>
-                        <button onclick="window.location.reload()" class="bg-youtube-primary text-youtube-secondary px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">
-                            Refresh
-                        </button>
-                    </div>
-                </div>
-            {% else %}
-                <div class="text-youtube-primary text-center p-4">Stream is not available</div>
-            {% endif %}
-        </div>
-    </div>
+<!-- Main Column (Nav + Stream) -->
+<div class="flex flex-col flex-grow h-full">
 
-    <!-- CHAT SIDEBAR -->
-    <div id="chat-pane" class="absolute top-0 bottom-0 right-0 w-[24rem] flex flex-col bg-youtube-secondary border-l border-youtube-primary z-50">
-        <!-- Dropdown -->
-        <div class="p-4 border-b border-youtube-primary bg-youtube-secondary flex justify-between items-center">
-            <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
-                {% for stream in active_streams %}
-                    <option value="{{ stream.channel_slug }}" {% if stream.channel_slug == current_stream %}selected{% endif %}>
-                        {{ stream.channel_slug }} ({{ stream.get_platform_display }}){% if stream.is_featured %} [Featured]{% endif %}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-        <!-- Header -->
-        <div class="p-4 border-b border-youtube-primary flex justify-between items-center">
-            <h2 class="text-youtube-primary font-semibold">Chat</h2>
-            <button id="chat-side-toggle" class="text-sm text-youtube-primary hover:text-youtube-secondary">
-                Move Chat
-            </button>
-        </div>
-        <!-- Chat Messages -->
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2">
-            <!-- Messages inserted here -->
-        </div>
-        <!-- Input -->
-        <div class="p-4 border-t border-youtube-primary">
+    <!-- NAVIGATION -->
+    <nav class="h-[3.5rem] bg-youtube-nav text-youtube-primary flex justify-between items-center px-4 shrink-0 z-40">
+        <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
+        <div>
             {% if user.is_authenticated %}
-                <form id="chat-form" class="flex gap-2">
-                    <input 
-                        type="text" 
-                        id="chat-input" 
-                        class="flex-1 bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                        placeholder="Type a message..."
-                        maxlength="{{ CHAT_MESSAGE_MAX_LENGTH }}"
-                    >
-                    <button 
-                        type="submit"
-                        class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors"
-                    >
-                        Send
-                    </button>
-                </form>
-            {% else %}
-                <div class="text-center">
-                    <a 
-                        href="{% url 'discord_login' %}?next=/watch/" 
-                        class="text-youtube-primary hover:text-youtube-secondary"
-                    >
-                        Login to chat
-                    </a>
+                <button id="profileDropdownBtn" class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none">
+                    <i class="fas fa-user text-youtube-primary"></i>
+                </button>
+                <div id="profileDropdown" class="dropdown-menu">
+                    <a href="{% url 'profile' %}" class="dropdown-item"><i class="fas fa-user-circle mr-2"></i> Profile</a>
+                    <div class="dropdown-divider"></div>
+                    <form action="{% url 'logout' %}" method="post" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item w-full text-left">
+                            <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                        </button>
+                    </form>
                 </div>
+            {% else %}
+                <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">Login with Discord</a>
             {% endif %}
         </div>
+    </nav>
+
+    <!-- Stream Area -->
+    <div class="flex-grow bg-black">
+        {% if embed_url %}
+            <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+        {% elif current_stream.platform == 'youtube' %}
+            <div class="h-full w-full flex flex-col items-center justify-center text-center p-4">
+                <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
+                <div class="flex gap-4 mt-4">
+                    <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank"
+                       class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">Visit Channel</a>
+                    <button onclick="window.location.reload()" class="bg-youtube-primary text-youtube-secondary px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">Refresh</button>
+                </div>
+            </div>
+        {% else %}
+            <div class="text-youtube-primary text-center p-4">Stream is not available</div>
+        {% endif %}
     </div>
+</div>
+
+<!-- Right Chat Panel -->
+<div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary">
+    {% include "home/chat_panel.html" %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Chat Side Toggle Logic
-    const chatPane = document.getElementById('chat-pane');
-    document.getElementById('chat-side-toggle')?.addEventListener('click', () => {
-        if (chatPane.classList.contains('right-0')) {
-            chatPane.classList.remove('right-0');
-            chatPane.classList.add('left-0');
-            chatPane.classList.add('border-r');
-            chatPane.classList.remove('border-l');
+    // Toggle chat side
+    const btn = document.getElementById('chat-side-toggle');
+    const chatLeft = document.getElementById('chat-left');
+    const chatRight = document.getElementById('chat-right');
+
+    function toggleChatSide() {
+        if (chatRight.classList.contains('hidden')) {
+            chatRight.classList.remove('hidden');
+            chatLeft.classList.add('hidden');
         } else {
-            chatPane.classList.remove('left-0');
-            chatPane.classList.add('right-0');
-            chatPane.classList.add('border-l');
-            chatPane.classList.remove('border-r');
+            chatRight.classList.add('hidden');
+            chatLeft.classList.remove('hidden');
         }
-    });
-
-    // Stream switcher
-    document.getElementById('stream-select').addEventListener('change', function(e) {
-        const streamSlug = e.target.value;
-        const formData = new FormData();
-        formData.append('stream_slug', streamSlug);
-
-        fetch('/switch-stream/', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const iframe = document.querySelector('iframe');
-                if (iframe) iframe.src = data.embed_url;
-            } else {
-                console.error('Stream switch error:', data.error);
-            }
-        })
-        .catch(err => console.error('Request failed:', err));
-    });
-
-    // WebSocket chat
-    const chatSocket = new WebSocket('ws://' + window.location.host + '/ws/chat/');
-    const chatMessages = document.getElementById('chat-messages');
-    const chatForm = document.getElementById('chat-form');
-    const chatInput = document.getElementById('chat-input');
-
-    chatSocket.onmessage = function(e) {
-        const data = JSON.parse(e.data);
-        if (data.error) return;
-        if (data.history) return data.history.forEach(appendMessage);
-        if (data.command === 'clear') return chatMessages.innerHTML = '';
-        appendMessage(data);
-    };
-
-    if (chatForm) {
-        chatForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const message = chatInput.value.trim();
-            if (message) {
-                chatSocket.send(JSON.stringify({ message }));
-                chatInput.value = '';
-            }
-        });
     }
 
-    function appendMessage(data) {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'flex items-start gap-2';
+    if (btn) {
+        btn.addEventListener('click', toggleChatSide);
+    }
 
-        const userDiv = document.createElement('div');
-        userDiv.className = 'font-semibold text-youtube-primary';
-        userDiv.textContent = data.user;
-
-        const msgText = document.createElement('div');
-        msgText.className = 'text-youtube-secondary';
-        msgText.innerHTML = data.message;
-
-        msgDiv.appendChild(userDiv);
-        msgDiv.appendChild(msgText);
-        chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Profile dropdown
+    const dropdownBtn = document.getElementById('profileDropdownBtn');
+    const dropdownMenu = document.getElementById('profileDropdown');
+    if (dropdownBtn && dropdownMenu) {
+        dropdownBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('show');
+        });
+        document.addEventListener('click', e => {
+            if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.remove('show');
+            }
+        });
     }
 </script>
 {% endblock %}
