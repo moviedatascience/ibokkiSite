@@ -109,7 +109,7 @@ class StreamSettings(models.Model):
 
     def get_embed_url(self):
         if self.platform == 'kick':
-            return f"https://player.kick.com/embed/{self.channel_slug}"
+            return f"https://player.kick.com/embed/live/{self.channel_slug}"
         elif self.platform == 'youtube':
             # Try to get the current live stream ID
             live_stream_id = self.get_youtube_live_stream_id()
