@@ -4,15 +4,15 @@
 {% block main_classes %}p-0 h-full w-full overflow-hidden{% endblock %}
 
 {% block content %}
-<div id="watch-flex-wrapper" class="flex flex-row h-full w-full">
+<div id="watch-flex-wrapper" class="flex flex-row h-full w-full min-h-0">
     <!-- Left Chat Panel -->
-    <div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-r border-youtube-primary z-30">
+    <div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-r border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
     </div>
 
     <!-- Main Column (Stream) -->
-    <div id="stream-area" class="flex-grow h-full flex flex-col">
-        <div class="flex-grow bg-black">
+    <div id="stream-area" class="flex-grow h-full flex flex-col min-h-0">
+        <div class="flex-grow bg-black min-h-0">
             {% if embed_url %}
                 <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
             {% elif current_stream.platform == 'youtube' %}
@@ -30,7 +30,7 @@
     </div>
 
     <!-- Right Chat Panel -->
-    <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30">
+    <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
     </div>
 </div>
@@ -50,12 +50,14 @@
             chatRight.classList.remove('hidden');
             chatLeft.classList.add('hidden');
             streamArea.classList.remove('ml-[24rem]');
-            streamArea.classList.add('mr-0');
+            streamArea.classList.add('mr-[24rem]');
+            streamArea.classList.remove('ml-[24rem]'); // ensure only one margin
         } else {
             chatLeft.classList.remove('hidden');
             chatRight.classList.add('hidden');
-            streamArea.classList.remove('mr-0');
+            streamArea.classList.remove('mr-[24rem]');
             streamArea.classList.add('ml-[24rem]');
+            streamArea.classList.remove('mr-[24rem]'); // ensure only one margin
         }
     }
 
