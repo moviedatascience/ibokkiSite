@@ -68,5 +68,32 @@
 
     // Initialize position
     updateChatPosition();
+
+    // Stream select dropdown logic (attach to all dropdowns)
+    document.querySelectorAll('#stream-select').forEach(function(select) {
+        select.addEventListener('change', function(e) {
+            const streamSlug = e.target.value;
+            const formData = new FormData();
+            formData.append('stream_slug', streamSlug);
+
+            fetch('/switch-stream/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const iframe = document.querySelector('iframe');
+                    if (iframe) iframe.src = data.embed_url;
+                } else {
+                    console.error('Stream switch error:', data.error);
+                }
+            })
+            .catch(err => console.error('Request failed:', err));
+        });
+    });
 </script>
 {% endblock %}
