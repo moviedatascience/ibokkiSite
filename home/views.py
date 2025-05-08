@@ -11,6 +11,8 @@ from django.contrib import messages
 from urllib.parse import urlparse, quote
 from django.http import HttpResponseBadRequest, JsonResponse
 import logging
+from django.core.serializers.json import DjangoJSONEncoder
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -207,12 +209,25 @@ def watch(request):
     if not stream and not active_streams.exists():
         return redirect('landing')
     
+    # Build a dict of all streams for SPA switching
+    streams_dict = {}
+    for s in active_streams:
+        key = f"{s.platform}/{s.channel_slug}"
+        streams_dict[key] = {
+            'platform': s.platform,
+            'channel_slug': s.channel_slug,
+            'embed_url': s.get_embed_url(),
+            'is_featured': s.is_featured,
+            'display': str(s),
+        }
+    
     context = {
         'stream_title': stream.channel_slug if stream else 'No Stream Available',
         'channel_slug': stream.channel_slug if stream else None,
         'embed_url': stream.get_embed_url() if stream else None,
         'active_streams': active_streams,
         'current_stream': stream,  # Pass the entire stream object
+        'streams_json': json.dumps(streams_dict, cls=DjangoJSONEncoder),
     }
     return render(request, 'home/watch.html', context)
 

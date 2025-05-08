@@ -2,7 +2,7 @@
 <div class="p-4 border-b border-youtube-primary bg-youtube-secondary">
     <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
         {% for stream in active_streams %}
-            <option value="{{ stream.channel_slug }}" {% if stream.channel_slug == current_stream %}selected{% endif %}>
+            <option value="{{ stream.platform }}/{{ stream.channel_slug }}" {% if stream == current_stream %}selected{% endif %}>
                 {{ stream.channel_slug }} ({{ stream.get_platform_display }}){% if stream.is_featured %} [Featured]{% endif %}
             </option>
         {% endfor %}
