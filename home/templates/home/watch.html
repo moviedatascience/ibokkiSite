@@ -4,9 +4,9 @@
 {% block main_classes %}p-0 h-full w-full overflow-hidden{% endblock %}
 
 {% block content %}
-<div id="watch-flex-wrapper" class="flex flex-row h-full w-full min-h-0 pt-[3.5rem]">
-    <!-- Left Chat Panel -->
-    <div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-r border-youtube-primary z-30 min-h-0">
+<div id="watch-flex-wrapper" class="flex flex-col md:flex-row h-full w-full min-h-0 pt-[3.5rem]">
+    <!-- Left Chat Panel (desktop only) -->
+    <div id="chat-left" class="hidden md:flex w-[24rem] h-full flex-col bg-youtube-secondary border-r border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
     </div>
 
@@ -31,8 +31,8 @@
         </div>
     </div>
 
-    <!-- Right Chat Panel -->
-    <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
+    <!-- Right Chat Panel (desktop: right, mobile: bottom) -->
+    <div id="chat-right" class="flex md:w-[24rem] w-full md:h-full h-[20rem] flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
     </div>
 </div>
@@ -40,13 +40,23 @@
 
 {% block extra_js %}
 <script>
-    // Chat side toggle logic
+    // Chat side toggle logic (desktop only)
     let chatOnRight = true;
     const chatLeft = document.getElementById('chat-left');
     const chatRight = document.getElementById('chat-right');
     const moveChatBtns = document.querySelectorAll('#chat-side-toggle');
 
+    function isDesktop() {
+        return window.matchMedia('(min-width: 768px)').matches;
+    }
+
     function updateChatPosition() {
+        if (!isDesktop()) {
+            // On mobile, always show right chat at bottom, hide left chat
+            chatRight.classList.remove('hidden');
+            chatLeft.classList.add('hidden');
+            return;
+        }
         if (chatOnRight) {
             chatRight.classList.remove('hidden');
             chatLeft.classList.add('hidden');
@@ -58,13 +68,16 @@
 
     moveChatBtns.forEach(btn => {
         btn.addEventListener('click', function() {
-            chatOnRight = !chatOnRight;
-            updateChatPosition();
+            if (isDesktop()) {
+                chatOnRight = !chatOnRight;
+                updateChatPosition();
+            }
         });
     });
 
     // Initialize position
     updateChatPosition();
+    window.addEventListener('resize', updateChatPosition);
 
     // Stream select dropdown logic (attach to all dropdowns)
     document.querySelectorAll('#stream-select').forEach(function(select) {
