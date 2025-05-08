@@ -4,6 +4,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from .models import ChatMessage, Emote
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -76,14 +79,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Get user info
         user = self.scope["user"]
         display_name = user.display_name or user.username
-        print(f"Sending message from {display_name}: {message}")
-        
+
+        # Save message to database
+        chat_message = await database_sync_to_async(ChatMessage.objects.create)(
+            user=user,
+            message=message
+        )
+
+        # Parse emotes in the message
+        parsed_message = await self.parse_emotes(message)
+
         # Send message to room group
         await self.channel_layer.group_send(
             self.room_group_name,
             {
                 'type': 'chat_message',
-                'message': message,
+                'message': parsed_message,
                 'user': display_name,
                 'user_id': user.id,
                 'is_staff': user.is_staff,
@@ -132,8 +143,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_chat_history(self):
-        # Implement chat history retrieval from database
-        return []
+        # Get the most recent N messages, newest last
+        messages = ChatMessage.objects.select_related('user').order_by('-timestamp')[:settings.CHAT_MESSAGE_HISTORY_LENGTH]
+        emotes = {e.code: e.image.url for e in Emote.objects.all()}
+        history = []
+        for msg in reversed(messages):
+            # Parse emotes for each message
+            parsed_message = self._parse_emotes_sync(msg.message, emotes)
+            history.append({
+                'message': parsed_message,
+                'user': msg.user.display_name or msg.user.username,
+                'user_id': msg.user.id,
+                'is_staff': msg.user.is_staff,
+                'timestamp': msg.timestamp.timestamp(),
+            })
+        return history
+
+    async def parse_emotes(self, message):
+        # Get all emotes from DB
+        emotes = await database_sync_to_async(lambda: list(Emote.objects.all()))()
+        emote_map = {e.code: e.image.url for e in emotes}
+        return self._parse_emotes_sync(message, emote_map)
+
+    def _parse_emotes_sync(self, message, emote_map):
+        # Replace emote codes with <img> tags
+        safe_message = escape(message)
+        for code, url in emote_map.items():
+            safe_message = safe_message.replace(
+                escape(code),
+                f'<img src="{url}" alt="{code}" class="inline-emote" style="height:1.5em;vertical-align:middle;">'
+            )
+        return safe_message
 
     async def send_chat_history(self):
         history = await self.get_chat_history()

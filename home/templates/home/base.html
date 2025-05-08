@@ -67,9 +67,11 @@
         }
     </style>
 </head>
-<body>
-    <nav class="bg-youtube-nav text-youtube-primary p-4">
-        <div class="container mx-auto flex justify-between items-center">
+<body class="{% block body_class %}{% endblock %}">
+
+    <!-- NAVIGATION BAR -->
+    <nav class="{% block nav_classes %}bg-youtube-nav text-youtube-primary p-4{% endblock %}">
+        <div class="{% block nav_inner_classes %}w-full flex justify-between items-center px-4{% endblock %}">
             <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
             <div class="flex items-center">
                 {% if user.is_authenticated %}
@@ -94,32 +96,34 @@
                         </div>
                     </div>
                 {% else %}
-                    <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">Login with Discord</a>
+                    <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">
+                        Login with Discord
+                    </a>
                 {% endif %}
             </div>
         </div>
     </nav>
 
-    <main class="w-full px-4 py-8">
-        {% block content %}
-        {% endblock %}
+    <!-- MAIN CONTENT -->
+    <main class="{% block main_classes %}w-full px-4 py-8{% endblock %}">
+        {% block content %}{% endblock %}
     </main>
 
-    {% block extra_js %}
-    {% endblock %}
+    <!-- PAGE-SPECIFIC JS -->
+    {% block extra_js %}{% endblock %}
 
+    <!-- Dropdown Toggle Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const dropdownBtn = document.getElementById('profileDropdownBtn');
             const dropdownMenu = document.getElementById('profileDropdown');
-            
+
             if (dropdownBtn && dropdownMenu) {
                 dropdownBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     dropdownMenu.classList.toggle('show');
                 });
 
-                // Close dropdown when clicking outside
                 document.addEventListener('click', function(e) {
                     if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
                         dropdownMenu.classList.remove('show');
@@ -129,4 +133,4 @@
         });
     </script>
 </body>
-</html> 
+</html>
