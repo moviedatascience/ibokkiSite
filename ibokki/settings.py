@@ -129,8 +129,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Session settings
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_AGE = 1209600  # 2 weeks in seconds
-SESSION_COOKIE_SECURE = False
-SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = True
 SESSION_SAVE_EVERY_REQUEST = True
 
 # Authentication backends
@@ -168,8 +167,12 @@ LOGIN_URL = "/discord/login/"  # Use relative URL
 LOGIN_REDIRECT_URL = "/watch/"  # Use relative URL
 
 # Security settings
-SECURE_SSL_REDIRECT = False
-CSRF_COOKIE_SECURE = False
+SECURE_SSL_REDIRECT = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'SAMEORIGIN'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
 CSRF_TRUSTED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
