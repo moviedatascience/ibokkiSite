@@ -7,9 +7,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
+        html, body {
+            height: 100%;
+        }
         body {
             background-color: #0f0f0f;
             color: #f1f1f1;
+            min-height: 100vh;
         }
         .bg-youtube-dark { background-color: #0f0f0f; }
         .bg-youtube-secondary { background-color: #272727; }
@@ -48,43 +52,41 @@
         }
     </style>
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="min-h-screen flex flex-col {% block body_class %}{% endblock %}">
 
-    <!-- NAVIGATION BAR -->
-    <nav class="{% block nav_classes %}bg-youtube-nav text-youtube-primary p-4{% endblock %}">
-        <div class="{% block nav_inner_classes %}w-full flex justify-between items-center px-4{% endblock %}">
-            <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
-            <div class="flex items-center">
-                {% if user.is_authenticated %}
-                    <div class="relative">
-                        <button 
-                            id="profileDropdownBtn"
-                            class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none"
-                        >
-                            <i class="fas fa-user text-youtube-primary"></i>
-                        </button>
-                        <div id="profileDropdown" class="dropdown-menu">
-                            <a href="{% url 'profile' %}" class="dropdown-item">
-                                <i class="fas fa-user-circle mr-2"></i> Profile
-                            </a>
-                            <div class="dropdown-divider"></div>
-                            <form action="{% url 'logout' %}" method="post" class="inline">
-                                {% csrf_token %}
-                                <button type="submit" class="dropdown-item w-full text-left">
-                                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                                </button>
-                            </form>
-                        </div>
+    <!-- FIXED NAVIGATION BAR -->
+    <nav class="fixed top-0 left-0 w-full h-[3.5rem] z-40 bg-youtube-nav text-youtube-primary flex justify-between items-center px-4">
+        <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
+        <div class="flex items-center">
+            {% if user.is_authenticated %}
+                <div class="relative">
+                    <button 
+                        id="profileDropdownBtn"
+                        class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none"
+                    >
+                        <i class="fas fa-user text-youtube-primary"></i>
+                    </button>
+                    <div id="profileDropdown" class="dropdown-menu">
+                        <a href="{% url 'profile' %}" class="dropdown-item">
+                            <i class="fas fa-user-circle mr-2"></i> Profile
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <form action="{% url 'logout' %}" method="post" class="inline">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item w-full text-left">
+                                <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                            </button>
+                        </form>
                     </div>
-                {% else %}
-                    <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">Login with Discord</a>
-                {% endif %}
-            </div>
+                </div>
+            {% else %}
+                <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">Login with Discord</a>
+            {% endif %}
         </div>
     </nav>
 
-    <!-- MAIN CONTENT -->
-    <main class="{% block main_classes %}w-full px-4 py-8{% endblock %}">
+    <!-- MAIN CONTENT (should be full height minus nav) -->
+    <main class="flex-1 flex flex-col pt-[3.5rem] {% block main_classes %}{% endblock %}">
         {% block content %}
         {% endblock %}
     </main>
