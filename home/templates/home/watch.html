@@ -52,7 +52,6 @@
 
     function updateChatPosition() {
         if (!isDesktop()) {
-            // On mobile, always show right chat at bottom, hide left chat
             chatRight.classList.remove('hidden');
             chatLeft.classList.add('hidden');
             return;
@@ -79,31 +78,43 @@
     updateChatPosition();
     window.addEventListener('resize', updateChatPosition);
 
-    // Stream select dropdown logic (attach to all dropdowns)
-    document.querySelectorAll('#stream-select').forEach(function(select) {
-        select.addEventListener('change', function(e) {
-            const streamSlug = e.target.value;
-            const formData = new FormData();
-            formData.append('stream_slug', streamSlug);
+    // --- SPA Stream Switching Logic ---
+    const streams = JSON.parse('{{ streams_json|escapejs }}');
+    const selectEls = document.querySelectorAll('#stream-select');
+    const iframe = document.querySelector('iframe');
 
-            fetch('/switch-stream/', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    function setStreamFromHash() {
+        let hash = window.location.hash.replace('#', '');
+        if (!hash || !streams[hash]) {
+            // Default to featured stream
+            for (const key in streams) {
+                if (streams[key].is_featured) {
+                    hash = key;
+                    window.location.hash = '#' + key;
+                    break;
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const iframe = document.querySelector('iframe');
-                    if (iframe) iframe.src = data.embed_url;
-                } else {
-                    console.error('Stream switch error:', data.error);
-                }
-            })
-            .catch(err => console.error('Request failed:', err));
+            }
+        }
+        if (streams[hash]) {
+            // Update iframe src
+            if (iframe && streams[hash].embed_url) {
+                iframe.src = streams[hash].embed_url;
+            }
+            // Update dropdowns
+            selectEls.forEach(sel => { sel.value = hash; });
+        }
+    }
+
+    // On dropdown change, update hash (no reload)
+    selectEls.forEach(sel => {
+        sel.addEventListener('change', function(e) {
+            window.location.hash = '#' + e.target.value;
         });
     });
+
+    // On hash change, update stream
+    window.addEventListener('hashchange', setStreamFromHash);
+    // On page load, set stream
+    setStreamFromHash();
 </script>
 {% endblock %}
