@@ -167,7 +167,7 @@ LOGIN_URL = "/discord/login/"  # Use relative URL
 LOGIN_REDIRECT_URL = "/watch/"  # Use relative URL
 
 # Security settings
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = False
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
