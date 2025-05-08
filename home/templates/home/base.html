@@ -50,79 +50,65 @@
 </head>
 <body class="{% block body_class %}{% endblock %}">
 
-    <!-- FIXED NAVIGATION BAR -->
-    <nav id="main-nav"
-         class="{% block nav_classes %}fixed top-0 left-0 w-full h-[3.5rem] z-40 bg-youtube-nav text-youtube-primary px-4 flex justify-between items-center transition-all ease-in-out duration-200{% endblock %}">
-        <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
-        <div class="flex items-center">
-            {% if user.is_authenticated %}
-                <div class="relative">
-                    <button 
-                        id="profileDropdownBtn"
-                        class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none"
-                    >
-                        <i class="fas fa-user text-youtube-primary"></i>
-                    </button>
-                    <div id="profileDropdown" class="dropdown-menu">
-                        <a href="{% url 'profile' %}" class="dropdown-item">
-                            <i class="fas fa-user-circle mr-2"></i> Profile
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <form action="{% url 'logout' %}" method="post" class="inline">
-                            {% csrf_token %}
-                            <button type="submit" class="dropdown-item w-full text-left">
-                                <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                            </button>
-                        </form>
+    <!-- NAVIGATION BAR -->
+    <nav class="{% block nav_classes %}bg-youtube-nav text-youtube-primary p-4{% endblock %}">
+        <div class="{% block nav_inner_classes %}w-full flex justify-between items-center px-4{% endblock %}">
+            <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
+            <div class="flex items-center">
+                {% if user.is_authenticated %}
+                    <div class="relative">
+                        <button 
+                            id="profileDropdownBtn"
+                            class="w-10 h-10 rounded-full bg-youtube-secondary flex items-center justify-center hover:bg-youtube-secondary focus:outline-none"
+                        >
+                            <i class="fas fa-user text-youtube-primary"></i>
+                        </button>
+                        <div id="profileDropdown" class="dropdown-menu">
+                            <a href="{% url 'profile' %}" class="dropdown-item">
+                                <i class="fas fa-user-circle mr-2"></i> Profile
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <form action="{% url 'logout' %}" method="post" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item w-full text-left">
+                                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            {% else %}
-                <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">
-                    Login with Discord
-                </a>
-            {% endif %}
+                {% else %}
+                    <a href="{% url 'discord_login' %}" class="hover:text-youtube-secondary">Login with Discord</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 
     <!-- MAIN CONTENT -->
-    <main class="{% block main_classes %}w-full pt-[3.5rem]{% endblock %}">
-        {% block content %}{% endblock %}
+    <main class="{% block main_classes %}w-full px-4 py-8{% endblock %}">
+        {% block content %}
+        {% endblock %}
     </main>
 
-    {% block extra_js %}{% endblock %}
+    {% block extra_js %}
+    {% endblock %}
 
-    <!-- Dropdown and Chat-Aware Nav Positioning Script -->
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const dropdownBtn = document.getElementById('profileDropdownBtn');
             const dropdownMenu = document.getElementById('profileDropdown');
-            const nav = document.getElementById('main-nav');
-
-            // Dropdown toggle logic
+            
             if (dropdownBtn && dropdownMenu) {
-                dropdownBtn.addEventListener('click', function (e) {
+                dropdownBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     dropdownMenu.classList.toggle('show');
                 });
-                document.addEventListener('click', function (e) {
+
+                // Close dropdown when clicking outside
+                document.addEventListener('click', function(e) {
                     if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
                         dropdownMenu.classList.remove('show');
                     }
                 });
-            }
-
-            // Optional: Detect chat side (if toggling client-side)
-            const chatPane = document.getElementById('chat-pane');
-            if (chatPane) {
-                if (chatPane.classList.contains('right-0')) {
-                    nav.classList.add('pr-[24rem]');
-                    nav.classList.remove('pl-[24rem]');
-                } else if (chatPane.classList.contains('left-0')) {
-                    nav.classList.add('pl-[24rem]');
-                    nav.classList.remove('pr-[24rem]');
-                } else {
-                    nav.classList.remove('pl-[24rem]', 'pr-[24rem]');
-                }
             }
         });
     </script>
