@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, StreamSettings
+from .models import CustomUser, StreamSettings, ChatMessage, Emote
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
@@ -39,3 +39,15 @@ class StreamSettingsAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ('user', 'message', 'timestamp')
+    readonly_fields = ('user', 'message', 'timestamp')
+    search_fields = ('user__username', 'message')
+    ordering = ('-timestamp',)
+
+@admin.register(Emote)
+class EmoteAdmin(admin.ModelAdmin):
+    list_display = ('code', 'is_animated')
+    search_fields = ('code',)

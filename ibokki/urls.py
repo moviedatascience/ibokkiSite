@@ -20,6 +20,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from django.shortcuts import redirect
 from django.conf import settings
+from django.conf.urls.static import static
 
 def redirect_to_discord_login(request):
     next_url = request.GET.get('next', '/watch/')
@@ -31,3 +32,6 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(next_page='landing'), name='logout'),
     path('accounts/login/', redirect_to_discord_login),  # Redirect default login to Discord login
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
