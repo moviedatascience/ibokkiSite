@@ -116,9 +116,9 @@ class StreamSettings(models.Model):
                 'liveStreamingDetails' in video_data['items'][0]):
                 logger.debug(f"Video {video_id} is live")
                 return video_id
-                
-            logger.debug(f"Video {video_id} is not live")
-            return None
+            
+            logger.debug(f"Video {video_id} is not live, returning latest VOD")
+            return video_id  # Return the latest video even if not live
             
         except Exception as e:
             logger.error(f"Error fetching YouTube live stream for {self.channel_slug}: {str(e)}")
