@@ -13,8 +13,14 @@
     <!-- Main Column (Stream) -->
     <div id="stream-area" class="flex-grow h-full flex flex-col min-h-0 min-w-0">
         <div class="flex-grow bg-black min-h-0 min-w-0 flex items-center justify-center">
-            <div class="aspect-[16/9] w-full h-full max-w-[100vw] max-h-[calc(100vh-3.5rem)] bg-black flex items-center justify-center">
-                <iframe src="{{ embed_url|default:'' }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms" style="border: none;"></iframe>
+            <div class="relative w-full max-w-full h-full max-h-[calc(100vh-3.5rem)] flex items-center justify-center">
+                <div class="aspect-[16/9] w-auto h-auto max-w-full max-h-full bg-black">
+                    <iframe src="{{ embed_url|default:'' }}"
+                            class="w-full h-full"
+                            allowfullscreen
+                            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                            style="border: none;"></iframe>
+                </div>
             </div>
         </div>
     </div>
