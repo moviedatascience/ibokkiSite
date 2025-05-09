@@ -13,8 +13,8 @@
     <!-- Main Column (Stream) -->
     <div id="stream-area" class="flex-grow h-full flex flex-col min-h-0 min-w-0">
         <div class="flex-grow bg-black min-h-0 min-w-0 flex items-center justify-center">
-            <div style="aspect-ratio: 16/9; height: 100%; max-width: 100vw; max-height: 100%; width: 100%; display: flex;">
-                <iframe src="{{ embed_url|default:'' }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
+            <div class="aspect-[16/9] w-full h-full flex items-center justify-center bg-black">
+                <iframe src="{{ embed_url|default:'' }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms" style="border: none;"></iframe>
             </div>
         </div>
     </div>
