@@ -6,6 +6,9 @@ from django.conf import settings
 import requests
 import json
 from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CustomUser(AbstractUser):
     display_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
@@ -52,6 +55,7 @@ class StreamSettings(models.Model):
     def get_youtube_live_stream_id(self):
         """Fetch the current live stream ID for a YouTube channel"""
         if not self.youtube_channel_id or not settings.YOUTUBE_API_KEY:
+            logger.debug(f"Missing YouTube channel ID or API key for {self.channel_slug}")
             return None
             
         try:
@@ -59,39 +63,50 @@ class StreamSettings(models.Model):
             if self.youtube_channel_id.startswith('@'):
                 # For @handle format, first get the channel ID
                 handle = self.youtube_channel_id[1:]  # Remove the @
+                logger.debug(f"Fetching channel ID for handle @{handle}")
                 channel_url = f"https://www.googleapis.com/youtube/v3/search?part=id&type=channel&q={handle}&key={settings.YOUTUBE_API_KEY}"
                 channel_response = requests.get(channel_url)
                 channel_data = channel_response.json()
                 
                 if 'items' not in channel_data or not channel_data['items']:
+                    logger.debug(f"No channel found for handle @{handle}")
                     return None
                     
                 channel_id = channel_data['items'][0]['id']['channelId']
+                logger.debug(f"Found channel ID {channel_id} for handle @{handle}")
             else:
                 # For direct channel ID format
                 channel_id = self.youtube_channel_id
+                logger.debug(f"Using direct channel ID {channel_id}")
             
             # Get the uploads playlist ID
+            logger.debug(f"Fetching uploads playlist for channel {channel_id}")
             channel_url = f"https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id={channel_id}&key={settings.YOUTUBE_API_KEY}"
             channel_response = requests.get(channel_url)
             channel_data = channel_response.json()
             
             if 'items' not in channel_data or not channel_data['items']:
+                logger.debug(f"No channel data found for ID {channel_id}")
                 return None
                 
             uploads_playlist_id = channel_data['items'][0]['contentDetails']['relatedPlaylists']['uploads']
+            logger.debug(f"Found uploads playlist {uploads_playlist_id}")
             
             # Get the latest video from the uploads playlist
+            logger.debug(f"Fetching latest video from playlist {uploads_playlist_id}")
             playlist_url = f"https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId={uploads_playlist_id}&maxResults=1&key={settings.YOUTUBE_API_KEY}"
             playlist_response = requests.get(playlist_url)
             playlist_data = playlist_response.json()
             
             if 'items' not in playlist_data or not playlist_data['items']:
+                logger.debug(f"No videos found in playlist {uploads_playlist_id}")
                 return None
                 
             video_id = playlist_data['items'][0]['snippet']['resourceId']['videoId']
+            logger.debug(f"Found video ID {video_id}")
             
             # Check if this video is currently live
+            logger.debug(f"Checking if video {video_id} is live")
             video_url = f"https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id={video_id}&key={settings.YOUTUBE_API_KEY}"
             video_response = requests.get(video_url)
             video_data = video_response.json()
@@ -99,12 +114,14 @@ class StreamSettings(models.Model):
             if ('items' in video_data and 
                 video_data['items'] and 
                 'liveStreamingDetails' in video_data['items'][0]):
+                logger.debug(f"Video {video_id} is live")
                 return video_id
                 
+            logger.debug(f"Video {video_id} is not live")
             return None
             
         except Exception as e:
-            print(f"Error fetching YouTube live stream: {str(e)}")
+            logger.error(f"Error fetching YouTube live stream for {self.channel_slug}: {str(e)}")
             return None
 
     def get_embed_url(self):
