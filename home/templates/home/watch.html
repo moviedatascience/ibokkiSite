@@ -17,14 +17,6 @@
                 <div style="aspect-ratio: 16/9; height: 100%; max-width: 100vw; max-height: 100%; width: 100%; display: flex;">
                     <iframe src="{{ embed_url }}" class="w-full h-full" allowfullscreen sandbox="allow-same-origin allow-scripts allow-popups allow-forms"></iframe>
                 </div>
-            {% elif current_stream.platform == 'youtube' %}
-                <div class="h-full w-full flex flex-col items-center justify-center text-center p-4">
-                    <img src="{% static 'home/images/offline.jpg' %}" alt="Stream Offline" class="w-full h-full object-contain rounded-lg">
-                    <div class="flex gap-4 mt-4">
-                        <a href="https://www.youtube.com/channel/{{ current_stream.youtube_channel_id }}" target="_blank" class="bg-[#ff0000] text-white px-6 py-2 rounded-lg hover:bg-[#cc0000] transition-colors">Visit Channel</a>
-                        <button onclick="window.location.reload()" class="bg-youtube-primary text-youtube-secondary px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors">Refresh</button>
-                    </div>
-                </div>
             {% else %}
                 <div class="text-youtube-primary text-center p-4">Stream is not available</div>
             {% endif %}

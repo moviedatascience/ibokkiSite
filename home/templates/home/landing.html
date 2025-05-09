@@ -8,29 +8,15 @@
         <!-- Main Content Section -->
         <div class="w-full">
             <div class="relative rounded-lg overflow-hidden" style="padding-top: 56.25%;"> <!-- 16:9 aspect ratio -->
-                {% if is_stream_live %}
-                    <img
-                        src="{% static 'home/images/online.jpg' %}"
-                        alt="Stream is Live"
-                        class="absolute top-0 left-0 w-full h-full object-cover"
-                    />
-                {% else %}
-                    <img
-                        src="{% static 'home/images/offline.jpg' %}"
-                        alt="Stream is Offline"
-                        class="absolute top-0 left-0 w-full h-full object-cover"
-                    />
-                {% endif %}
+                <img
+                    src="{% static 'home/images/online.jpg' %}"
+                    alt="Stream is Live"
+                    class="absolute top-0 left-0 w-full h-full object-cover"
+                />
             </div>
             <div class="mt-4">
-                {% if is_stream_live %}
-                    <h1 class="text-2xl font-bold text-youtube-primary">{{ current_stream_title }}</h1>
-                    <p class="text-youtube-secondary mt-2">Stream is Live on Kick</p>
-                {% else %}
-                    <h1 class="text-2xl font-bold text-youtube-primary">Stream is Currently Offline</h1>
-                    <p class="text-youtube-secondary mt-2">Check back later for more content!</p>
-                {% endif %}
-                
+                <h1 class="text-2xl font-bold text-youtube-primary">{{ current_stream_title }}</h1>
+                <p class="text-youtube-secondary mt-2">Stream is Live on Kick</p>
                 <div class="mt-6 flex gap-4">
                     {% if user.is_authenticated %}
                         <a href="{% url 'watch' %}" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
@@ -45,7 +31,6 @@
                         Subscribe
                     </a>
                 </div>
-
                 <div class="mt-8 p-4 bg-youtube-secondary rounded-lg border border-youtube">
                     <h3 class="font-semibold mb-2 text-youtube-primary">Stream Information</h3>
                     <p class="text-sm text-youtube-secondary">Join our community to watch streams, chat with other viewers, and get notified when we go live!</p>

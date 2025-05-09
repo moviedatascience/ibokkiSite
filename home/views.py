@@ -25,17 +25,13 @@ def landing_page(request):
     if not featured_stream:
         featured_stream = StreamSettings.objects.filter(is_active=True).first()
     
-    # Get channel info to check if stream is live
+    # Only set the title, no is_stream_live logic
     if featured_stream:
-        channel_data = get_channel_info(featured_stream.channel_slug)
-        is_live = channel_data.get('is_live', False)
-        title = channel_data.get('title', 'Error Checking Stream')
+        title = featured_stream.channel_slug
     else:
-        is_live = False
         title = 'No Stream Available'
     
     context = {
-        "is_stream_live": is_live,
         "current_stream_title": title,
         'is_authenticated': request.user.is_authenticated,
         'user': request.user
