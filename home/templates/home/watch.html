@@ -79,10 +79,10 @@
 
     selectEls.forEach(select => {
         select.addEventListener('change', function() {
-            const [platform, channel] = this.value.split('/');
-            const stream = streams.find(s => s.platform === platform && s.channel_slug === channel);
+            const stream = streams[this.value];
             if (stream && stream.embed_url) {
                 iframe.src = stream.embed_url;
+                window.location.hash = '#' + this.value;
             }
         });
     });
