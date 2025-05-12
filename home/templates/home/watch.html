@@ -86,5 +86,67 @@
             }
         });
     });
+
+    // --- WebSocket Chat Integration ---
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    let chatSocket = null;
+
+    function connectChatSocket() {
+        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsPath = wsScheme + '://' + window.location.host + '/ws/chat/';
+        chatSocket = new WebSocket(wsPath);
+
+        chatSocket.onopen = function(e) {
+            console.log('Chat WebSocket connection established.');
+        };
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.history) {
+                // Load chat history
+                chatMessages.innerHTML = '';
+                data.history.forEach(msg => {
+                    appendMessage(msg);
+                });
+            } else if (data.message) {
+                // Append new message
+                appendMessage(data);
+            } else if (data.error) {
+                console.error('Chat error:', data.error);
+            }
+        };
+
+        chatSocket.onclose = function(e) {
+            console.log('Chat WebSocket connection closed.');
+            setTimeout(connectChatSocket, 1000);
+        };
+
+        chatSocket.onerror = function(e) {
+            console.error('Chat WebSocket error:', e);
+        };
+    }
+
+    function appendMessage(data) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'text-youtube-primary';
+        messageDiv.innerHTML = `<strong>${data.user}</strong>: ${data.message}`;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    if (chatForm) {
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (message && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
+                chatSocket.send(JSON.stringify({ message: message }));
+                chatInput.value = '';
+            }
+        });
+    }
+
+    connectChatSocket();
 </script>
 {% endblock %}
