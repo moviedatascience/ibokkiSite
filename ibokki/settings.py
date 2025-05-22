@@ -32,17 +32,7 @@ ALLOWED_HOSTS = ["ibokki.com", "www.ibokki.com", "localhost", "127.0.0.1", ".ngr
 
 # Application definition
 
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
-    "home.apps.HomeConfig",
-    "csp",
-    "corsheaders",
-]
+INSTALLED_APPS = [    "django.contrib.admin",    "django.contrib.auth",    "django.contrib.contenttypes",    "django.contrib.sessions",    "django.contrib.messages",    "django.contrib.staticfiles",    "channels",    "home.apps.HomeConfig",    "csp",    "corsheaders",]
 
 MIDDLEWARE = [
     "csp.middleware.CSPMiddleware",
@@ -252,28 +242,4 @@ LOGGING = {
     },
 }
 
-# Content Security Policy settings
-CSP_DEFAULT_SRC = ("'self'", "https:")
-CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https:")
-CSP_STYLE_SRC = ("'self'", "'unsafe-inline'", "https:")
-CSP_IMG_SRC = ("'self'", "data:", "https:")
-CSP_FRAME_SRC = (
-    "'self'",
-    "https://*.youtube.com",
-    "https://*.twitch.tv",
-    "https://*.kick.com",
-    "https://kick.com",
-    "https://player.kick.com",
-    "https://*.rumble.com",
-    "https://*.bitchute.com",
-    "https://*.odysee.com",
-    "https://*.vimeo.com",
-    "https://*.dailymotion.com",
-)
-CSP_CONNECT_SRC = ("'self'", "https:", "wss:")
-CSP_FONT_SRC = ("'self'", "https:", "data:")
-
-# Enable CSP reporting in production
-if not DEBUG:
-    CSP_REPORT_ONLY = False
-    CSP_REPORT_URI = '/csp-report/'
+# Content Security Policy settingsCONTENT_SECURITY_POLICY = {    'DIRECTIVES': {        'default-src': ("'self'", "https:"),        'script-src': ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"),        'style-src': ("'self'", "'unsafe-inline'", "https:"),        'img-src': ("'self'", "data:", "https:"),        'frame-src': (            "'self'",            "https://*.youtube.com",            "https://*.twitch.tv",            "https://*.kick.com",            "https://kick.com",            "https://player.kick.com",            "https://*.rumble.com",            "https://*.bitchute.com",            "https://*.odysee.com",            "https://*.vimeo.com",            "https://*.dailymotion.com",        ),        'connect-src': ("'self'", "https:", "wss:"),        'font-src': ("'self'", "https:", "data:"),    }}# Enable CSP reporting in productionif not DEBUG:    CONTENT_SECURITY_POLICY['REPORT_ONLY'] = False    CONTENT_SECURITY_POLICY['DIRECTIVES']['report-uri'] = '/csp-report/'

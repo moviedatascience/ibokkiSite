@@ -26,7 +26,7 @@
     </div>
 
     <!-- Right Chat Panel -->
-    <div id="chat-right" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
+    <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
     </div>
 </div>
@@ -92,10 +92,17 @@
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     let chatSocket = null;
+    
+    console.log('Chat elements found:', {
+        chatMessages: !!chatMessages,
+        chatForm: !!chatForm,
+        chatInput: !!chatInput
+    });
 
     function connectChatSocket() {
         const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const wsPath = wsScheme + '://' + window.location.host + '/ws/chat/';
+        console.log('Attempting to connect to WebSocket:', wsPath);
         chatSocket = new WebSocket(wsPath);
 
         chatSocket.onopen = function(e) {
@@ -113,6 +120,9 @@
             } else if (data.message) {
                 // Append new message
                 appendMessage(data);
+            } else if (data.command === 'clear') {
+                // Clear chat messages
+                chatMessages.innerHTML = '';
             } else if (data.error) {
                 console.error('Chat error:', data.error);
             }
