@@ -224,6 +224,7 @@ def watch(request):
         'active_streams': active_streams,
         'current_stream': stream,  # Pass the entire stream object
         'streams_json': json.dumps(streams_dict, cls=DjangoJSONEncoder),
+        'CHAT_MESSAGE_MAX_LENGTH': settings.CHAT_MESSAGE_MAX_LENGTH,
     }
     return render(request, 'home/watch.html', context)
 
@@ -239,4 +240,4 @@ def switch_stream(request):
                     'channel_slug': stream_slug,
                     'embed_url': stream.get_embed_url()
                 })
-    return JsonResponse({'success': False, 'error': 'Invalid request'})
+    return JsonResponse({'success': False, 'error': 'Invalid request'}) 
