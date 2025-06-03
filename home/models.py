@@ -147,10 +147,17 @@ class StreamSettings(models.Model):
 class ChatMessage(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     message = models.TextField()
+    stream_id = models.CharField(max_length=100, default='general', help_text="Stream identifier for chat grouping")
     timestamp = models.DateTimeField(default=timezone.now)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['stream_id', '-timestamp']),
+            models.Index(fields=['user', '-timestamp']),
+        ]
+
     def __str__(self):
-        return f"{self.user.display_name or self.user.username}: {self.message[:30]}"
+        return f"{self.user.display_name or self.user.username}: {self.message[:30]} [{self.stream_id}]"
 
 class Emote(models.Model):
     code = models.CharField(max_length=32, unique=True, help_text="Emote code, e.g. :OMEGALUL:")
