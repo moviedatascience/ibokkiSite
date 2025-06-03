@@ -33,6 +33,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'home/js/chat.js' %}"></script>
 <script>
     // Chat side toggle logic (desktop only)
     let chatOnRight = true;
@@ -76,22 +77,30 @@
     const streams = JSON.parse('{{ streams_json|escapejs }}');
     const selectEls = document.querySelectorAll('#stream-select');
     const iframe = document.querySelector('iframe');
+    let currentStreamKey = '{{ current_stream.platform }}/{{ current_stream.channel_slug }}';
 
     selectEls.forEach(select => {
         select.addEventListener('change', function() {
-            const stream = streams[this.value];
+            const streamKey = this.value;
+            const stream = streams[streamKey];
             if (stream && stream.embed_url) {
                 iframe.src = stream.embed_url;
-                window.location.hash = '#' + this.value;
+                window.location.hash = '#' + streamKey;
+                currentStreamKey = streamKey;
+                
+                // Switch chat to new stream
+                const streamId = streamKey.replace('/', '_');
+                if (window.chatUI && window.chatUI.chatClient) {
+                    window.chatUI.chatClient.switchStream(streamId);
+                }
             }
         });
     });
 
-    // --- WebSocket Chat Integration ---
+    // --- Enhanced WebSocket Chat Integration ---
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
-    let chatSocket = null;
     
     console.log('Chat elements found:', {
         chatMessages: !!chatMessages,
@@ -99,64 +108,45 @@
         chatInput: !!chatInput
     });
 
-    function connectChatSocket() {
-        const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const wsPath = wsScheme + '://' + window.location.host + '/ws/chat/';
-        console.log('Attempting to connect to WebSocket:', wsPath);
-        chatSocket = new WebSocket(wsPath);
+    // Initialize chat client
+    let chatClient = null;
+    let chatUI = null;
 
-        chatSocket.onopen = function(e) {
-            console.log('Chat WebSocket connection established.');
-        };
-
-        chatSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            if (data.history) {
-                // Load chat history
-                chatMessages.innerHTML = '';
-                data.history.forEach(msg => {
-                    appendMessage(msg);
-                });
-            } else if (data.message) {
-                // Append new message
-                appendMessage(data);
-            } else if (data.command === 'clear') {
-                // Clear chat messages
-                chatMessages.innerHTML = '';
-            } else if (data.error) {
-                console.error('Chat error:', data.error);
-            }
-        };
-
-        chatSocket.onclose = function(e) {
-            console.log('Chat WebSocket connection closed.');
-            setTimeout(connectChatSocket, 1000);
-        };
-
-        chatSocket.onerror = function(e) {
-            console.error('Chat WebSocket error:', e);
-        };
-    }
-
-    function appendMessage(data) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'text-youtube-primary';
-        messageDiv.innerHTML = `<strong>${data.user}</strong>: ${data.message}`;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-
-    if (chatForm) {
-        chatForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const message = chatInput.value.trim();
-            if (message && chatSocket && chatSocket.readyState === WebSocket.OPEN) {
-                chatSocket.send(JSON.stringify({ message: message }));
-                chatInput.value = '';
-            }
+    if (chatMessages && chatForm && chatInput) {
+        // Create chat client with options
+        chatClient = new ChatClient({
+            reconnectInterval: 1000,
+            maxReconnectAttempts: 10,
+            pingInterval: 30000,
+            pongTimeout: 10000
         });
+
+        // Create chat UI manager
+        chatUI = new ChatUI(chatClient, {
+            maxMessages: 100
+        });
+
+        // Initialize UI
+        if (chatUI.init('#chat-messages', '#chat-form', '#chat-input')) {
+            // Connect to current stream's chat
+            const initialStreamId = currentStreamKey ? currentStreamKey.replace('/', '_') : 'general';
+            chatClient.connect(initialStreamId);
+            
+            // Make globally accessible for stream switching
+            window.chatUI = chatUI;
+            window.chatClient = chatClient;
+        } else {
+            console.error('Failed to initialize chat UI');
+        }
+    } else {
+        console.warn('Chat elements not found, chat will not be initialized');
     }
 
-    connectChatSocket();
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        if (chatClient) {
+            chatClient.disconnect();
+        }
+    });
 </script>
 {% endblock %}

@@ -12,4 +12,8 @@ cryptography==44.0.2
 daphne==4.1.2
 Django==5.2
 gunicorn==23.0.0
+python-dotenv==1.0.0
+requests==2.32.3
+Pillow==10.4.0
+whitenoise==6.7.0
 
