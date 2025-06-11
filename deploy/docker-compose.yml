@@ -54,7 +54,7 @@ services:
 
   worker:
     build: .
-    command: python manage.py runworker
+    command: python manage.py runworker default
     volumes:
       - .:/app
     depends_on:
