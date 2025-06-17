@@ -8,10 +8,13 @@ from django.conf import settings
 from .models import ChatMessage, Emote
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        print(f"WebSocket connection attempt from {self.scope['user']}")
+        logger.info(f"WebSocket connection attempt from {self.scope['user']}")
         
         # Extract stream identifier from URL path or query parameters
         url_route = self.scope.get('url_route', {})
@@ -37,7 +40,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
         
         await self.accept()
-        print(f"WebSocket connection accepted for {self.scope['user']} in room {self.room_group_name}")
+        logger.info(
+            f"WebSocket connection accepted for {self.scope['user']} in room {self.room_group_name}"
+        )
         
         # Send chat history for this specific stream
         await self.send_chat_history()
@@ -47,7 +52,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         asyncio.create_task(self.keepalive_ping())
 
     async def disconnect(self, close_code):
-        print(f"WebSocket disconnected for {self.scope['user']} from room {self.room_group_name}")
+        logger.info(
+            f"WebSocket disconnected for {self.scope['user']} from room {self.room_group_name}"
+        )
         # Leave room group
         await self.channel_layer.group_discard(
             self.room_group_name,
@@ -55,7 +62,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def receive(self, text_data):
-        print(f"Received message from {self.scope['user']}: {text_data}")
+        logger.info(f"Received message from {self.scope['user']}: {text_data}")
         try:
             text_data_json = json.loads(text_data)
             message_type = text_data_json.get('type', 'message')
@@ -86,7 +93,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.handle_message(message)
                     
         except json.JSONDecodeError as e:
-            print(f"Error decoding message: {e}")
+            logger.error(f"Error decoding message: {e}")
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'error': 'Invalid message format'
@@ -111,7 +118,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         
-        print(f"User {self.scope['user']} switched to room {self.room_group_name}")
+        logger.info(
+            f"User {self.scope['user']} switched to room {self.room_group_name}"
+        )
         
         # Send chat history for the new stream
         await self.send_chat_history()
@@ -139,24 +148,28 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 
                 # Check if client is still responding
                 if time.time() - self.last_ping > 90:  # 90 seconds timeout
-                    print(f"Client {self.scope['user']} ping timeout, closing connection")
+                    logger.warning(
+                        f"Client {self.scope['user']} ping timeout, closing connection"
+                    )
                     await self.close()
                     break
                     
             except Exception as e:
-                print(f"Keepalive error: {e}")
+                logger.error(f"Keepalive error: {e}")
                 break
 
     async def handle_message(self, message):
         if not self.scope["user"].is_authenticated:
-            print(f"Unauthenticated user attempted to send message: {self.scope['user']}")
+            logger.warning(
+                f"Unauthenticated user attempted to send message: {self.scope['user']}"
+            )
             return
         
         # Rate limiting
         current_time = time.time()
         last_message_time = getattr(self, 'last_message_time', 0)
         if current_time - last_message_time < settings.CHAT_MESSAGE_RATE_LIMIT:
-            print(f"Rate limit exceeded for {self.scope['user']}")
+            logger.warning(f"Rate limit exceeded for {self.scope['user']}")
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'error': 'Message rate limit exceeded'
@@ -167,7 +180,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         
         # Validate message length
         if len(message) > settings.CHAT_MESSAGE_MAX_LENGTH:
-            print(f"Message too long from {self.scope['user']}")
+            logger.warning(f"Message too long from {self.scope['user']}")
             await self.send(text_data=json.dumps({
                 'type': 'error',
                 'error': 'Message too long'
@@ -240,7 +253,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Group message handlers
     async def chat_message(self, event):
-        print(f"Broadcasting message: {event}")
+        logger.info(f"Broadcasting message: {event}")
         # Send message to WebSocket
         await self.send(text_data=json.dumps({
             'type': 'message',
