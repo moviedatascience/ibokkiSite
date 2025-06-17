@@ -2,6 +2,9 @@ from django.conf import settings
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
 from .models import CustomUser
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DiscordAuthBackend(ModelBackend):
     def authenticate(self, request, username=None, password=None, **kwargs):
@@ -30,31 +33,31 @@ class DiscordAuthBackend(ModelBackend):
             user.first_name = discord_user.get('username', '')
             
             # Check admin status
-            print(f"\n=== Auth Backend Debug ===")
-            print(f"Checking admin status for Discord ID: {discord_id}")
-            print(f"Admin IDs from settings: {settings.DISCORD_ADMIN_IDS}")
-            print(f"Current user is_staff: {user.is_staff}")
-            print(f"Current user is_superuser: {user.is_superuser}")
+            logger.debug("=== Auth Backend Debug ===")
+            logger.debug(f"Checking admin status for Discord ID: {discord_id}")
+            logger.debug(f"Admin IDs from settings: {settings.DISCORD_ADMIN_IDS}")
+            logger.debug(f"Current user is_staff: {user.is_staff}")
+            logger.debug(f"Current user is_superuser: {user.is_superuser}")
             
             # Update admin status
             if discord_id in settings.DISCORD_ADMIN_IDS:
-                print("Granting admin privileges...")
+                logger.info("Granting admin privileges...")
                 user.is_staff = True
                 user.is_superuser = True
             else:
-                print("User is not in admin list")
+                logger.info("User is not in admin list")
                 user.is_staff = False
                 user.is_superuser = False
             
             user.save()
-            print(f"Updated user is_staff: {user.is_staff}")
-            print(f"Updated user is_superuser: {user.is_superuser}")
-            print("=== End Auth Backend Debug ===\n")
+            logger.debug(f"Updated user is_staff: {user.is_staff}")
+            logger.debug(f"Updated user is_superuser: {user.is_superuser}")
+            logger.debug("=== End Auth Backend Debug ===")
             
             return user
             
         except Exception as e:
-            print(f"Error in DiscordAuthBackend: {str(e)}")
+            logger.error(f"Error in DiscordAuthBackend: {str(e)}")
             return None
     
     def get_user(self, user_id):

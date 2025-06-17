@@ -1,8 +1,11 @@
 # home/kick_api.py
 import requests
 import time
-from django.conf import settings  
+from django.conf import settings
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Our in-memory token cache
 TOKEN_CACHE = {
@@ -45,7 +48,7 @@ def get_client_credentials_token():
         return access_token
 
     except requests.RequestException as e:
-        print("DEBUG: Error obtaining Kick token", e)
+        logger.error("Error obtaining Kick token", exc_info=e)
         return None
 
 
@@ -62,7 +65,7 @@ def get_channel_info(channel_slug):
             'playback_url': f"https://player.kick.com/{channel_slug}"
         }
     except Exception as e:
-        print(f"DEBUG: Error getting channel info: {str(e)}")
+        logger.error(f"Error getting channel info: {str(e)}")
         return {
             'is_live': True,  # Let the player handle this
             'title': 'Live Stream',  # Let the player handle this
