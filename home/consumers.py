@@ -77,13 +77,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.switch_stream(new_stream_id)
             else:
                 # Legacy support for old message format
-            message = text_data_json.get('message', '')
-            command = text_data_json.get('command', '')
-            
-            if command:
-                await self.handle_command(command)
+                message = text_data_json.get('message', '')
+                command = text_data_json.get('command', '')
+
+                if command:
+                    await self.handle_command(command)
                 elif message:
-                await self.handle_message(message)
+                    await self.handle_message(message)
                     
         except json.JSONDecodeError as e:
             print(f"Error decoding message: {e}")
