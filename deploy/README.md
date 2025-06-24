@@ -9,7 +9,6 @@ The production deployment uses:
 - **Daphne** (ASGI) for WebSocket connections on port 8001  
 - **Redis** for Django Channels message passing
 - **Nginx** as reverse proxy and load balancer
-- **Django Channels Workers** for background processing
 
 ## Prerequisites
 
@@ -110,13 +109,6 @@ chmod +x deploy/start_gunicorn.sh
 **Terminal 2 - Daphne (WebSocket):**
 ```bash
 chmod +x deploy/start_daphne.sh
-./deploy/start_daphne.sh
-```
-
-**Terminal 3 - Channels Worker:**
-```bash
-chmod +x deploy/start_worker.sh
-./deploy/start_worker.sh
 ```
 
 ## Nginx Configuration
@@ -201,43 +193,25 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
-**channels-worker.service:**
-```ini
-[Unit]
-Description=Django Channels Worker
-After=network.target
-
-[Service]
-User=www-data
-Group=www-data
-WorkingDirectory=/path/to/ibokkiSite
-Environment="PATH=/path/to/ibokkiSite/venv/bin"
-ExecStart=/path/to/ibokkiSite/venv/bin/python manage.py runworker
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
 
 2. **Enable and start services:**
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable gunicorn daphne channels-worker
-sudo systemctl start gunicorn daphne channels-worker
+sudo systemctl enable gunicorn daphne
+sudo systemctl start gunicorn daphne
 ```
 
 ## Monitoring and Logs
 
 1. **View service status:**
 ```bash
-sudo systemctl status gunicorn daphne channels-worker
+sudo systemctl status gunicorn daphne
 ```
 
 2. **View logs:**
 ```bash
 sudo journalctl -u gunicorn -f
 sudo journalctl -u daphne -f
-sudo journalctl -u channels-worker -f
 ```
 
 3. **Application logs:**
@@ -276,7 +250,6 @@ CACHES = {
 ### Horizontal Scaling
 - Run multiple Gunicorn workers: `--workers 4`
 - Run multiple Daphne instances on different ports
-- Run multiple Channel workers: `--processes 4`
 - Use Redis Cluster for high availability
 
 ### Monitoring
@@ -296,7 +269,6 @@ CACHES = {
 
 2. **Chat messages not appearing:**
    - Verify Redis is running and accessible
-   - Check Channel worker logs
    - Ensure proper Redis URL configuration
 
 3. **High memory usage:**
