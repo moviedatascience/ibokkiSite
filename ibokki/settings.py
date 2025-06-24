@@ -12,6 +12,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 from dotenv import load_dotenv
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -137,12 +140,12 @@ DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 
 # Handle admin IDs
 raw_admin_ids = os.getenv("DISCORD_ADMIN_IDS", "")
+DISCORD_ADMIN_IDS = [id.strip().replace('discord_', '') for id in raw_admin_ids.split(",") if id.strip()]
 if DEBUG:
-    print(f"\n=== Settings Debug ===")
-    print(f"Raw DISCORD_ADMIN_IDS from env: {raw_admin_ids}")
-    DISCORD_ADMIN_IDS = [id.strip().replace('discord_', '') for id in raw_admin_ids.split(",") if id.strip()]
-    print(f"Processed DISCORD_ADMIN_IDS: {DISCORD_ADMIN_IDS}")
-    print("=== End Settings Debug ===\n")
+    logger.debug("=== Settings Debug ===")
+    logger.debug(f"Raw DISCORD_ADMIN_IDS from env: {raw_admin_ids}")
+    logger.debug(f"Processed DISCORD_ADMIN_IDS: {DISCORD_ADMIN_IDS}")
+    logger.debug("=== End Settings Debug ===")
 
 # Environment settings
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # 'local' or 'production'

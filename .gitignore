@@ -4,5 +4,11 @@ __pycache__/
 venv/
 *:Zone.Identifier
 
+# Logs
+debug.log
+
+# SQLite databases
+*.sqlite3
+
 # Environment files
 .env
