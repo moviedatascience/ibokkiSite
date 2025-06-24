@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
@@ -21,10 +19,10 @@ services:
       - "5432:5432"
 
   web:
-    build: .
+    build: ..
     command: gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 ibokki.wsgi:application
     volumes:
-      - .:/app
+      - ..:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     ports:
@@ -38,10 +36,10 @@ services:
       - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
 
   websocket:
-    build: .
+    build: ..
     command: daphne -b 0.0.0.0 -p 8001 ibokki.asgi:application
     volumes:
-      - .:/app
+      - ..:/app
     ports:
       - "8001:8001"
     depends_on:
@@ -53,10 +51,10 @@ services:
       - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
 
   worker:
-    build: .
+    build: ..
     command: python manage.py runworker
     volumes:
-      - .:/app
+      - ..:/app
     depends_on:
       - db
       - redis
@@ -71,7 +69,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx.conf:/etc/nginx/nginx.conf
       - static_volume:/static
       - media_volume:/media
     depends_on:
@@ -82,4 +80,4 @@ volumes:
   postgres_data:
   redis_data:
   static_volume:
-  media_volume: 
+  media_volume:
