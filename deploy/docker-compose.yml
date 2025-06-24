@@ -64,6 +64,12 @@ services:
       - web
       - websocket
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+
 volumes:
   postgres_data:
   redis_data:
