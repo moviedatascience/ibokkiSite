@@ -50,18 +50,6 @@ services:
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
 
-  worker:
-    build: ..
-    command: python manage.py runworker
-    volumes:
-      - ..:/app
-    depends_on:
-      - db
-      - redis
-    environment:
-      - DEBUG=False
-      - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
 
   nginx:
     image: nginx:alpine
