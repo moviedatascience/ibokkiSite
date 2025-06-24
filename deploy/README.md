@@ -10,6 +10,7 @@ The production deployment uses:
 - **Redis** for Django Channels message passing
 - **Nginx** as reverse proxy and load balancer
 - **Django Channels Workers** for background processing
+- **Cloudflare Tunnel** for exposing services securely (optional)
 
 ## Prerequisites
 
@@ -45,7 +46,16 @@ KICK_CLIENT_SECRET=your-kick-client-secret
 
 # Admin Users
 DISCORD_ADMIN_IDS=discord_user_id_1,discord_user_id_2
+
+# Cloudflare Tunnel
+CLOUDFLARE_TUNNEL_TOKEN=your-cloudflare-tunnel-token
 ```
+
+## Cloudflare Tunnel Setup
+
+1. Create a tunnel in the Cloudflare dashboard.
+2. Copy the **tunnel token** and set it in your `.env` as `CLOUDFLARE_TUNNEL_TOKEN`.
+3. Start the tunnel with Docker Compose using the `cloudflared` service or via systemd.
 
 ## Deployment Options
 
@@ -69,6 +79,11 @@ docker-compose exec web python manage.py createsuperuser
 4. **Collect static files:**
 ```bash
 docker-compose exec web python manage.py collectstatic --noinput
+```
+
+5. **Start Cloudflare tunnel (optional):**
+```bash
+docker-compose up -d cloudflared
 ```
 
 ### Option 2: Manual Deployment
@@ -183,6 +198,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
+
 **daphne.service:**
 ```ini
 [Unit]
@@ -219,11 +235,27 @@ Restart=on-failure
 WantedBy=multi-user.target
 ```
 
+**cloudflared.service:**
+```ini
+[Unit]
+Description=Cloudflare Tunnel
+After=network.target
+
+[Service]
+User=www-data
+Environment="TUNNEL_TOKEN=<your-token>"
+ExecStart=/usr/bin/cloudflared tunnel run
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
 2. **Enable and start services:**
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable gunicorn daphne channels-worker
-sudo systemctl start gunicorn daphne channels-worker
+sudo systemctl enable gunicorn daphne channels-worker cloudflared
+sudo systemctl start gunicorn daphne channels-worker cloudflared
 ```
 
 ## Monitoring and Logs
