@@ -69,22 +69,22 @@ docker-compose -f deploy/docker-compose.yml up -d
 
 2. **Run migrations:**
 ```bash
-docker-compose exec web python manage.py migrate
+docker-compose -f deploy/docker-compose.yml exec web python manage.py migrate
 ```
 
 3. **Create superuser:**
 ```bash
-docker-compose exec web python manage.py createsuperuser
+docker-compose -f deploy/docker-compose.yml exec web python manage.py createsuperuser
 ```
 
 4. **Collect static files:**
 ```bash
-docker-compose exec web python manage.py collectstatic --noinput
+docker-compose -f deploy/docker-compose.yml exec web python manage.py collectstatic --noinput
 ```
 
 5. **Start Cloudflare tunnel (optional):**
 ```bash
-docker-compose up -d cloudflared
+docker-compose -f deploy/docker-compose.yml up -d cloudflared
 ```
 
 ### Option 2: Manual Deployment
