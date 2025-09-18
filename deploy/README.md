@@ -56,28 +56,30 @@ DISCORD_ADMIN_IDS=discord_user_id_1,discord_user_id_2
 - **Local development (`manage.py`)** – place your `.env` in the project root (`ibokkiSite/.env`).
 - **Docker Compose (`deploy/docker-compose.yml`)** – Docker Compose automatically searches for an `.env` that sits beside the compose file, so use `ibokkiSite/deploy/.env` when running the services defined there.
 
-Both locations are now supported by the Django settings loader, so you can keep separate environment files for local development and containerized deployments.
+Both locations are now supported by the Django settings loader, so you can keep separate environment files for local development and containerized deployments. Cloudflare tunnels now rely on the configuration and credentials files described below, so no additional environment variables are required. The legacy token-based `TUNNEL_TOKEN` approach is deprecated in this project.
 
 ## Cloudflare Tunnel Setup
 
 The Docker Compose stack now mounts a Cloudflare configuration directory from
-`deploy/cloudflared` into the container. Follow these steps to provide the
-necessary files:
+`deploy/cloudflared` into the container at `/etc/cloudflared`. Follow these
+steps to provide the necessary files:
 
 1. **Create a named tunnel** in the Cloudflare dashboard (Zero Trust → Access →
    Tunnels) or by running `cloudflared tunnel create` locally.
 2. **Download the credentials file** that Cloudflare generates for the tunnel
    (a JSON file named `<TUNNEL_UUID>.json`). Place this file in
-   `deploy/cloudflared/` so it gets mounted into the container.
+   `deploy/cloudflared/` so it gets mounted into the container as
+   `/etc/cloudflared/<TUNNEL_UUID>.json`.
 3. **Copy the sample configuration**:
    ```bash
    cp deploy/cloudflared/config.example.yml deploy/cloudflared/config.yml
    ```
    Edit `config.yml` and replace the placeholder tunnel UUID, credentials
-   filename, and hostname with the values from your Cloudflare account. The
-   `service: http://nginx:80` entry is important—it tells Cloudflare to forward
-   traffic to the Nginx container inside the Compose network so both HTTP and
-   WebSocket requests reach the app.
+   filename (including the `/etc/cloudflared/` prefix), and hostname with the
+   values from your Cloudflare account. The `service: http://nginx:80` entry is
+   important—it tells Cloudflare to forward traffic to the Nginx container
+   inside the Compose network so both HTTP and WebSocket requests reach the
+   app.
 4. (Optional) If you manage DNS through Cloudflare, make sure the hostname you
    specified in `config.yml` points to the tunnel.
 5. Start the tunnel with Docker Compose once the config and credentials are in
@@ -245,6 +247,12 @@ WantedBy=multi-user.target
 ```
 
 
+Before creating a systemd service for Cloudflare, copy the same
+`deploy/cloudflared/config.yml` and credentials JSON you prepared for Docker
+Compose into `/etc/cloudflared/` so the service can read them. The config file
+should continue to reference the credentials file with an absolute path such as
+`/etc/cloudflared/<TUNNEL_UUID>.json`.
+
 **cloudflared.service:**
 ```ini
 [Unit]
@@ -253,13 +261,18 @@ After=network.target
 
 [Service]
 User=www-data
-Environment="TUNNEL_TOKEN=<your-token>"
-ExecStart=/usr/bin/cloudflared tunnel run
+WorkingDirectory=/etc/cloudflared
+ExecStart=/usr/bin/cloudflared tunnel --config /etc/cloudflared/config.yml run
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **Note:** Running Cloudflare Tunnel with just a token (`cloudflared tunnel run`
+> and a `TUNNEL_TOKEN`) is still supported by Cloudflare but deprecated in this
+> project. Stick to the config/credentials-file flow so the Compose stack,
+> systemd units, and documentation all align on the same setup.
 
 2. **Enable and start services:**
 ```bash
