@@ -248,4 +248,63 @@ LOGGING = {
     },
 }
 
-# Content Security Policy settingsCONTENT_SECURITY_POLICY = {    'DIRECTIVES': {        'default-src': ("'self'", "https:"),        'script-src': ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"),        'style-src': ("'self'", "'unsafe-inline'", "https:"),        'img-src': ("'self'", "data:", "https:"),        'frame-src': (            "'self'",            "https://*.youtube.com",            "https://*.twitch.tv",            "https://*.kick.com",            "https://kick.com",            "https://player.kick.com",            "https://*.rumble.com",            "https://*.bitchute.com",            "https://*.odysee.com",            "https://*.vimeo.com",            "https://*.dailymotion.com",        ),        'connect-src': ("'self'", "https:", "wss:"),        'font-src': ("'self'", "https:", "data:"),    }}# Enable CSP reporting in productionif not DEBUG:    CONTENT_SECURITY_POLICY['REPORT_ONLY'] = False    CONTENT_SECURITY_POLICY['DIRECTIVES']['report-uri'] = '/csp-report/'
+# Content Security Policy settings
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ("'self'", "https:"),
+        "script-src": (
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "https:",
+            "https://cdn.tailwindcss.com",
+            "https://kit.fontawesome.com",
+            "https://ka-f.fontawesome.com",
+        ),
+        "style-src": (
+            "'self'",
+            "'unsafe-inline'",
+            "https:",
+            "https://cdnjs.cloudflare.com",
+            "https://fonts.googleapis.com",
+        ),
+        "img-src": ("'self'", "data:", "https:"),
+        "frame-src": (
+            "'self'",
+            "https://*.youtube.com",
+            "https://*.twitch.tv",
+            "https://*.kick.com",
+            "https://kick.com",
+            "https://player.kick.com",
+            "https://*.rumble.com",
+            "https://*.bitchute.com",
+            "https://*.odysee.com",
+            "https://*.vimeo.com",
+            "https://*.dailymotion.com",
+        ),
+        "connect-src": ("'self'", "https:", "wss:"),
+        "font-src": (
+            "'self'",
+            "https:",
+            "data:",
+            "https://cdnjs.cloudflare.com",
+            "https://fonts.gstatic.com",
+            "https://ka-f.fontawesome.com",
+        ),
+    }
+}
+
+# Apply CSP directives to django-csp settings
+for _directive, _sources in CONTENT_SECURITY_POLICY["DIRECTIVES"].items():
+    setting_name = f"CSP_{_directive.replace('-', '_').upper()}"
+    globals()[setting_name] = _sources
+
+# Enable CSP reporting in production
+if not DEBUG:
+    CONTENT_SECURITY_POLICY["REPORT_ONLY"] = False
+    CONTENT_SECURITY_POLICY["DIRECTIVES"]["report-uri"] = "/csp-report/"
+    CSP_REPORT_ONLY = False
+    CSP_REPORT_URI = ("/csp-report/",)
+
+    # Ensure report-uri is exposed to django-csp
+    globals()["CSP_REPORT_URI"] = CSP_REPORT_URI
