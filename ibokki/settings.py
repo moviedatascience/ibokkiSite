@@ -253,4 +253,63 @@ LOGGING = {
     },
 }
 
-# Content Security Policy settingsCONTENT_SECURITY_POLICY = {    'DIRECTIVES': {        'default-src': ("'self'", "https:"),        'script-src': ("'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"),        'style-src': ("'self'", "'unsafe-inline'", "https:"),        'img-src': ("'self'", "data:", "https:"),        'frame-src': (            "'self'",            "https://*.youtube.com",            "https://*.twitch.tv",            "https://*.kick.com",            "https://kick.com",            "https://player.kick.com",            "https://*.rumble.com",            "https://*.bitchute.com",            "https://*.odysee.com",            "https://*.vimeo.com",            "https://*.dailymotion.com",        ),        'connect-src': ("'self'", "https:", "wss:"),        'font-src': ("'self'", "https:", "data:"),    }}# Enable CSP reporting in productionif not DEBUG:    CONTENT_SECURITY_POLICY['REPORT_ONLY'] = False    CONTENT_SECURITY_POLICY['DIRECTIVES']['report-uri'] = '/csp-report/'
+# Content Security Policy settings
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ("'self'", "https:"),
+        "script-src": (
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "https:",
+            "https://cdn.tailwindcss.com",
+            "https://kit.fontawesome.com",
+            "https://ka-f.fontawesome.com",
+        ),
+        "style-src": (
+            "'self'",
+            "'unsafe-inline'",
+            "https:",
+            "https://cdnjs.cloudflare.com",
+            "https://fonts.googleapis.com",
+        ),
+        "img-src": ("'self'", "data:", "https:"),
+        "frame-src": (
+            "'self'",
+            "https://*.youtube.com",
+            "https://*.twitch.tv",
+            "https://*.kick.com",
+            "https://kick.com",
+            "https://player.kick.com",
+            "https://*.rumble.com",
+            "https://*.bitchute.com",
+            "https://*.odysee.com",
+            "https://*.vimeo.com",
+            "https://*.dailymotion.com",
+        ),
+        "connect-src": ("'self'", "https:", "wss:"),
+        "font-src": (
+            "'self'",
+            "https:",
+            "data:",
+            "https://cdnjs.cloudflare.com",
+            "https://fonts.gstatic.com",
+            "https://ka-f.fontawesome.com",
+        ),
+    },
+}
+
+CSP_DEFAULT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["default-src"]
+CSP_SCRIPT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["script-src"]
+CSP_STYLE_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["style-src"]
+CSP_IMG_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["img-src"]
+CSP_FRAME_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["frame-src"]
+CSP_CONNECT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"]
+CSP_FONT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["font-src"]
+
+# Enable CSP reporting in production
+if not DEBUG:
+    CONTENT_SECURITY_POLICY["REPORT_ONLY"] = False
+    CONTENT_SECURITY_POLICY["DIRECTIVES"]["report-uri"] = ("/csp-report/",)
+    CSP_REPORT_ONLY = False
+    CSP_REPORT_URI = ("/csp-report/",)
