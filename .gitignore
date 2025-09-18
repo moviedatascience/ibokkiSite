@@ -12,3 +12,6 @@ debug.log
 
 # Environment files
 .env
+# Cloudflared tunnel configuration (contains secrets)
+deploy/cloudflared/config.yml
+deploy/cloudflared/*.json

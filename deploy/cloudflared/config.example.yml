@@ -1,0 +1,20 @@
+# Example Cloudflare Tunnel configuration for the Docker Compose stack.
+# Copy this file to `deploy/cloudflared/config.yml` and fill in the tunnel
+# identifier, hostname and credentials file that Cloudflare provides for your
+# account.
+
+# Replace with the UUID that Cloudflare assigns to your tunnel.
+tunnel: YOUR_TUNNEL_UUID
+
+# Cloudflared reads the credentials JSON that you download from Cloudflare.
+# Place that JSON file in the same folder and set the matching filename here.
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_UUID.json
+
+ingress:
+  # Replace `stream.example.com` with the hostname you created in Cloudflare.
+  - hostname: stream.example.com
+    # Target the Nginx service inside the Docker network so both HTTP and
+    # WebSocket traffic reach the app correctly.
+    service: http://nginx:80
+  # Catch-all rule so other hostnames return a 404 instead of hanging.
+  - service: http_status:404
