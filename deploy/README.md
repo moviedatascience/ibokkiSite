@@ -49,7 +49,6 @@ KICK_CLIENT_SECRET=your-kick-client-secret
 DISCORD_ADMIN_IDS=discord_user_id_1,discord_user_id_2
 
 # Cloudflare Tunnel
-CLOUDFLARE_TUNNEL_TOKEN=your-cloudflare-tunnel-token
 ```
 
 ### Supported `.env` locations
@@ -61,9 +60,36 @@ Both locations are now supported by the Django settings loader, so you can keep 
 
 ## Cloudflare Tunnel Setup
 
-1. Create a tunnel in the Cloudflare dashboard.
-2. Copy the **tunnel token** and set it in your `.env` as `CLOUDFLARE_TUNNEL_TOKEN`.
-3. Start the tunnel with Docker Compose using the `cloudflared` service or via systemd.
+The Docker Compose stack now mounts a Cloudflare configuration directory from
+`deploy/cloudflared` into the container. Follow these steps to provide the
+necessary files:
+
+1. **Create a named tunnel** in the Cloudflare dashboard (Zero Trust → Access →
+   Tunnels) or by running `cloudflared tunnel create` locally.
+2. **Download the credentials file** that Cloudflare generates for the tunnel
+   (a JSON file named `<TUNNEL_UUID>.json`). Place this file in
+   `deploy/cloudflared/` so it gets mounted into the container.
+3. **Copy the sample configuration**:
+   ```bash
+   cp deploy/cloudflared/config.example.yml deploy/cloudflared/config.yml
+   ```
+   Edit `config.yml` and replace the placeholder tunnel UUID, credentials
+   filename, and hostname with the values from your Cloudflare account. The
+   `service: http://nginx:80` entry is important—it tells Cloudflare to forward
+   traffic to the Nginx container inside the Compose network so both HTTP and
+   WebSocket requests reach the app.
+4. (Optional) If you manage DNS through Cloudflare, make sure the hostname you
+   specified in `config.yml` points to the tunnel.
+5. Start the tunnel with Docker Compose once the config and credentials are in
+   place:
+   ```bash
+   docker-compose -f deploy/docker-compose.yml up -d cloudflared
+   ```
+
+You can tail the tunnel logs to verify the connection:
+```bash
+docker-compose -f deploy/docker-compose.yml logs -f cloudflared
+```
 
 ## Deployment Options
 
@@ -89,7 +115,7 @@ docker-compose -f deploy/docker-compose.yml exec web python manage.py createsupe
 docker-compose -f deploy/docker-compose.yml exec web python manage.py collectstatic --noinput
 ```
 
-5. **Start Cloudflare tunnel (optional):**
+5. **Start Cloudflare tunnel (optional, after configuring `deploy/cloudflared/`):**
 ```bash
 docker-compose -f deploy/docker-compose.yml up -d cloudflared
 ```
