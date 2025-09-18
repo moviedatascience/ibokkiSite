@@ -52,6 +52,13 @@ DISCORD_ADMIN_IDS=discord_user_id_1,discord_user_id_2
 CLOUDFLARE_TUNNEL_TOKEN=your-cloudflare-tunnel-token
 ```
 
+### Supported `.env` locations
+
+- **Local development (`manage.py`)** – place your `.env` in the project root (`ibokkiSite/.env`).
+- **Docker Compose (`deploy/docker-compose.yml`)** – Docker Compose automatically searches for an `.env` that sits beside the compose file, so use `ibokkiSite/deploy/.env` when running the services defined there.
+
+Both locations are now supported by the Django settings loader, so you can keep separate environment files for local development and containerized deployments.
+
 ## Cloudflare Tunnel Setup
 
 1. Create a tunnel in the Cloudflare dashboard.

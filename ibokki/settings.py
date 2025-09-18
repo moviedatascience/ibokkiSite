@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-load_dotenv()
+primary_env_path = BASE_DIR / ".env"
+secondary_env_path = BASE_DIR / "deploy" / ".env"
+
+loaded = load_dotenv(primary_env_path)
+if not loaded:
+    load_dotenv(secondary_env_path)
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'fallback_key')
 
