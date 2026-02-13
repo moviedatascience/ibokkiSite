@@ -1,0 +1,12 @@
+You've been invited to join Ibokki!
+
+{{ inviter }} has invited you to join the Ibokki streaming community.
+
+Click the link below to create your account:
+{{ register_url }}
+
+This invitation link will expire in {{ expiry_hours }} hours.
+
+If you did not expect this invitation, you can safely ignore this email.
+
+-- Ibokki
