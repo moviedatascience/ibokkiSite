@@ -364,20 +364,31 @@ class ChatUI {
         if (!this.messageContainer) return;
         
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'chat-message text-youtube-primary py-1';
+        messageDiv.className = 'chat-message text-youtube-primary py-1 break-words';
         
-        const timeStr = new Date(data.timestamp * 1000).toLocaleTimeString();
-        const userClass = data.is_staff ? 'font-bold text-red-400' : 'font-semibold';
+        const timestamp = data.timestamp ? new Date(data.timestamp * 1000) : new Date();
+        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const userClass = data.is_staff ? 'font-bold text-red-400' : 'font-semibold text-blue-400';
         
         messageDiv.innerHTML = `
-            <span class="text-xs text-gray-400">[${timeStr}]</span>
-            <span class="${userClass}">${data.user}:</span>
-            <span class="message-content">${data.message}</span>
+            <span class="text-[10px] text-gray-500 mr-1">${timeStr}</span>
+            <span class="${userClass} mr-1 cursor-pointer hover:underline" onclick="window.chatUI.insertMention('${data.user}')">${data.user}:</span>
+            <span class="message-content text-gray-200">${data.message}</span>
         `;
         
         this.messageContainer.appendChild(messageDiv);
         this.scrollToBottom();
         this.limitMessages();
+    }
+
+    insertMention(username) {
+        if (this.inputField) {
+            const mention = `@${username} `;
+            if (!this.inputField.value.includes(mention)) {
+                this.inputField.value = mention + this.inputField.value;
+            }
+            this.inputField.focus();
+        }
     }
     
     clearMessages() {
@@ -417,7 +428,13 @@ class ChatUI {
     
     scrollToBottom() {
         if (this.messageContainer) {
-            this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+            // Only auto-scroll if user is already near bottom
+            const threshold = 100;
+            const isNearBottom = this.messageContainer.scrollHeight - this.messageContainer.scrollTop - this.messageContainer.clientHeight < threshold;
+            
+            if (isNearBottom) {
+                this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
+            }
         }
     }
     

@@ -165,6 +165,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
             return
         
+        # Basic message cleaning
+        message = message.strip()
+        if not message:
+            return
+
         # Rate limiting
         current_time = time.time()
         last_message_time = getattr(self, 'last_message_time', 0)
@@ -312,10 +317,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def _parse_emotes_sync(self, message, emote_map):
         # Replace emote codes with <img> tags
         safe_message = escape(message)
-        for code, url in emote_map.items():
+        # Sort codes by length descending to avoid partial matches (e.g., :LUL: before :LULW:)
+        sorted_codes = sorted(emote_map.keys(), key=len, reverse=True)
+        for code in sorted_codes:
+            url = emote_map[code]
             safe_message = safe_message.replace(
                 escape(code),
-                f'<img src="{url}" alt="{code}" class="inline-emote" style="height:1.5em;vertical-align:middle;">'
+                f'<img src="{url}" alt="{code}" class="inline-emote" title="{code}">'
             )
         return safe_message
 
