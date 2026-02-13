@@ -5,9 +5,8 @@
 
 {% block content %}
 <div id="watch-flex-wrapper" class="flex flex-col md:flex-row h-full w-full min-h-0 pt-[3.5rem]">
-    <!-- Left Chat Panel -->
+    <!-- Left Chat Panel (empty container; chat panel is moved here via JS when toggled) -->
     <div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-r border-youtube-primary z-30 min-h-0">
-        {% include "home/chat_panel.html" %}
     </div>
 
     <!-- Main Column (Stream) -->
@@ -46,18 +45,19 @@
     }
 
     function updateChatPosition() {
-        if (!isDesktop()) {
-            chatRight.classList.remove('hidden');
-            chatLeft.classList.add('hidden');
-            return;
+        const target = (!isDesktop() || chatOnRight) ? chatRight : chatLeft;
+        const source = (target === chatRight) ? chatLeft : chatRight;
+
+        // Move chat panel content to the target container
+        if (target.children.length === 0 && source.children.length > 0) {
+            while (source.firstChild) {
+                target.appendChild(source.firstChild);
+            }
         }
-        if (chatOnRight) {
-            chatRight.classList.remove('hidden');
-            chatLeft.classList.add('hidden');
-        } else {
-            chatLeft.classList.remove('hidden');
-            chatRight.classList.add('hidden');
-        }
+
+        // Show target, hide source
+        target.classList.remove('hidden');
+        source.classList.add('hidden');
     }
 
     moveChatBtns.forEach(btn => {
