@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
+<div class="container mx-auto px-4 py-8 pt-[4.5rem]">
     <div class="flex flex-col">
         <!-- Main Content Section -->
         <div class="w-full">
@@ -18,15 +18,9 @@
                 <h1 class="text-2xl font-bold text-youtube-primary">{{ current_stream_title }}</h1>
                 <p class="text-youtube-secondary mt-2">Stream is Live on Kick</p>
                 <div class="mt-6 flex gap-4">
-                    {% if user.is_authenticated %}
-                        <a href="{% url 'watch' %}" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
-                            Watch Stream
-                        </a>
-                    {% else %}
-                        <a href="{% url 'discord_login' %}?next=/watch/" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
-                            Login to Watch
-                        </a>
-                    {% endif %}
+                    <a href="{% url 'watch' %}" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
+                        Watch Stream
+                    </a>
                     <a href="#" class="bg-youtube-secondary text-youtube-primary px-6 py-3 rounded-lg hover:bg-youtube-secondary focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
                         Subscribe
                     </a>

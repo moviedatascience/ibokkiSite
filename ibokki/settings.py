@@ -132,37 +132,34 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 # Authentication backends
 AUTHENTICATION_BACKENDS = [
-    'home.auth.DiscordAuthBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
 # Custom user model
 AUTH_USER_MODEL = 'home.CustomUser'
 
-# Discord settings, loaded from .env
-DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-
-# Handle admin IDs
-raw_admin_ids = os.getenv("DISCORD_ADMIN_IDS", "")
-DISCORD_ADMIN_IDS = [id.strip().replace('discord_', '') for id in raw_admin_ids.split(",") if id.strip()]
-if DEBUG:
-    logger.debug("=== Settings Debug ===")
-    logger.debug(f"Raw DISCORD_ADMIN_IDS from env: {raw_admin_ids}")
-    logger.debug(f"Processed DISCORD_ADMIN_IDS: {DISCORD_ADMIN_IDS}")
-    logger.debug("=== End Settings Debug ===")
-
 # Environment settings
 ENVIRONMENT = os.getenv("ENVIRONMENT", "local")  # 'local' or 'production'
 BASE_URL = "http://localhost:8000" if ENVIRONMENT == "local" else os.getenv("BASE_URL", "https://your-production-domain.com")
 # Ensure BASE_URL doesn't end with a slash
 BASE_URL = BASE_URL.rstrip('/')
-# Construct redirect URI with trailing slash to match URL pattern
-DISCORD_REDIRECT_URI = f"{BASE_URL}/discord/callback/"
 
 # Auth settings
-LOGIN_URL = "/discord/login/"  # Use relative URL
-LOGIN_REDIRECT_URL = "/watch/"  # Use relative URL
+LOGIN_URL = "/"
+LOGIN_REDIRECT_URL = "/home/"
+
+# Email settings (ProtonMail SMTP)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.protonmail.ch'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'loremipsum@ibokki.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'loremipsum@ibokki.com')
+
+# Use console email backend for local development
+if ENVIRONMENT == 'local':
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Security settings
 SECURE_SSL_REDIRECT = False

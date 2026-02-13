@@ -34,6 +34,9 @@ services:
       - DEBUG=False
       - REDIS_URL=redis://redis:6379
       - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
 
   websocket:
     build: ..

@@ -39,14 +39,14 @@ POSTGRES_PASSWORD=your-postgres-password
 REDIS_URL=redis://localhost:6379
 
 # External APIs
-DISCORD_CLIENT_ID=your-discord-client-id
-DISCORD_CLIENT_SECRET=your-discord-client-secret
 YOUTUBE_API_KEY=your-youtube-api-key
 KICK_CLIENT_ID=your-kick-client-id
 KICK_CLIENT_SECRET=your-kick-client-secret
 
-# Admin Users
-DISCORD_ADMIN_IDS=discord_user_id_1,discord_user_id_2
+# Email (ProtonMail SMTP)
+EMAIL_HOST_USER=loremipsum@ibokki.com
+EMAIL_HOST_PASSWORD=your-protonmail-smtp-token
+DEFAULT_FROM_EMAIL=loremipsum@ibokki.com
 
 # Cloudflare Tunnel
 ```

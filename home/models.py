@@ -5,19 +5,144 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
 import json
+import hashlib
+import secrets
+from datetime import timedelta
 from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)
 
 class CustomUser(AbstractUser):
+    email = models.EmailField(unique=True)
     display_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    
+    invites_remaining = models.PositiveIntegerField(default=2)
+
     def save(self, *args, **kwargs):
-        # If display_name is not set, use the username without the discriminator
-        if not self.display_name and '#' in self.username:
-            self.display_name = self.username.split('#')[0]
+        # If display_name is not set, default to username
+        if not self.display_name:
+            self.display_name = self.username
         super().save(*args, **kwargs)
+
+    def can_invite(self):
+        """Check if user can send an invitation."""
+        if self.is_superuser:
+            return True
+        return self.invites_remaining > 0
+
+
+class Invitation(models.Model):
+    email = models.EmailField()
+    token_hash = models.CharField(max_length=64, unique=True)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='invitations_sent'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['token_hash']),
+            models.Index(fields=['email']),
+        ]
+
+    def __str__(self):
+        return f"Invite to {self.email} by {self.invited_by.username} ({'used' if self.used else 'pending'})"
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.used and not self.is_expired
+
+    @staticmethod
+    def hash_token(token):
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @classmethod
+    def create_invitation(cls, email, invited_by, expiry_hours=72):
+        """Create a new invitation and return the raw token (shown only once)."""
+        raw_token = secrets.token_urlsafe(48)
+        token_hash = cls.hash_token(raw_token)
+        invitation = cls.objects.create(
+            email=email,
+            token_hash=token_hash,
+            invited_by=invited_by,
+            expires_at=timezone.now() + timedelta(hours=expiry_hours),
+        )
+        return invitation, raw_token
+
+    @classmethod
+    def validate_token(cls, raw_token):
+        """Validate a raw token and return the invitation if valid."""
+        token_hash = cls.hash_token(raw_token)
+        try:
+            invitation = cls.objects.get(token_hash=token_hash)
+            if invitation.is_valid:
+                return invitation
+        except cls.DoesNotExist:
+            pass
+        return None
+
+
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='password_reset_tokens'
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['token_hash']),
+        ]
+
+    def __str__(self):
+        return f"Password reset for {self.user.username} ({'used' if self.used else 'pending'})"
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    @property
+    def is_valid(self):
+        return not self.used and not self.is_expired
+
+    @staticmethod
+    def hash_token(token):
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @classmethod
+    def create_token(cls, user, expiry_hours=1):
+        """Create a new reset token and return the raw token (shown only once)."""
+        # Invalidate any existing unused tokens for this user
+        cls.objects.filter(user=user, used=False).update(used=True)
+        raw_token = secrets.token_urlsafe(48)
+        token_hash = cls.hash_token(raw_token)
+        reset_token = cls.objects.create(
+            user=user,
+            token_hash=token_hash,
+            expires_at=timezone.now() + timedelta(hours=expiry_hours),
+        )
+        return reset_token, raw_token
+
+    @classmethod
+    def validate_token(cls, raw_token):
+        """Validate a raw token and return the token object if valid."""
+        token_hash = cls.hash_token(raw_token)
+        try:
+            token_obj = cls.objects.get(token_hash=token_hash)
+            if token_obj.is_valid:
+                return token_obj
+        except cls.DoesNotExist:
+            pass
+        return None
 
 # Create your models here.
 
