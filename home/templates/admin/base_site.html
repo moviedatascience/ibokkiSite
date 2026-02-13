@@ -1,0 +1,459 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {% translate 'Ibokki Admin' %}{% endblock %}
+
+{% block branding %}
+<div id="site-name"><a href="{% url 'admin:index' %}">Ibokki Administration</a></div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* ===== Ibokki Dark Admin Theme ===== */
+
+    :root {
+        --ibk-bg-primary: #0f0f0f;
+        --ibk-bg-secondary: #1a1a1a;
+        --ibk-bg-tertiary: #272727;
+        --ibk-bg-input: #0f0f0f;
+        --ibk-border: #303030;
+        --ibk-text-primary: #f1f1f1;
+        --ibk-text-secondary: #aaaaaa;
+        --ibk-accent: #ff0000;
+        --ibk-accent-hover: #cc0000;
+        --ibk-link: #e57373;
+        --ibk-link-hover: #ff8a80;
+        --ibk-success: #4caf50;
+        --ibk-error: #ef4444;
+        --ibk-warning: #ff9800;
+        --ibk-info: #2196f3;
+    }
+
+    /* Header */
+    #header {
+        background: var(--ibk-bg-secondary) !important;
+        color: var(--ibk-text-primary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+    }
+    #header a:link, #header a:visited {
+        color: var(--ibk-text-primary) !important;
+    }
+    #branding h1, #branding h1 a {
+        color: var(--ibk-text-primary) !important;
+    }
+    #user-tools {
+        color: var(--ibk-text-secondary) !important;
+    }
+    #user-tools a {
+        color: var(--ibk-link) !important;
+        border-bottom: none !important;
+    }
+    #user-tools a:hover {
+        color: var(--ibk-link-hover) !important;
+    }
+
+    /* Body & Container */
+    body {
+        background: var(--ibk-bg-primary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    #container {
+        background: var(--ibk-bg-primary) !important;
+    }
+    #content {
+        background: var(--ibk-bg-primary) !important;
+    }
+    #content-main {
+        background: var(--ibk-bg-primary) !important;
+    }
+
+    /* Breadcrumbs */
+    div.breadcrumbs {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-secondary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+    }
+    div.breadcrumbs a {
+        color: var(--ibk-link) !important;
+    }
+
+    /* Content Titles */
+    #content h1, #content h2, #content h3 {
+        color: var(--ibk-text-primary) !important;
+    }
+
+    /* Module (sections) */
+    .module {
+        background: var(--ibk-bg-secondary) !important;
+        border: 1px solid var(--ibk-border) !important;
+        border-radius: 8px !important;
+        overflow: hidden;
+    }
+    .module h2, .module caption {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Dashboard modules */
+    .dashboard #content-main .module table th {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+
+    /* Tables */
+    #result_list table {
+        background: var(--ibk-bg-secondary) !important;
+    }
+    #result_list table thead th {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+        border-bottom: 2px solid var(--ibk-border) !important;
+    }
+    #result_list table thead th a {
+        color: var(--ibk-text-primary) !important;
+    }
+    #result_list table tbody tr {
+        border-bottom: 1px solid var(--ibk-border) !important;
+    }
+    #result_list table tbody tr:nth-child(odd) {
+        background: var(--ibk-bg-secondary) !important;
+    }
+    #result_list table tbody tr:nth-child(even) {
+        background: var(--ibk-bg-primary) !important;
+    }
+    #result_list table tbody tr:hover {
+        background: var(--ibk-bg-tertiary) !important;
+    }
+    #result_list table td, #result_list table th {
+        color: var(--ibk-text-primary) !important;
+        border-left: none !important;
+        border-right: none !important;
+    }
+    #result_list table td a {
+        color: var(--ibk-link) !important;
+    }
+
+    /* General tables */
+    table td, table th {
+        color: var(--ibk-text-primary) !important;
+    }
+    table a {
+        color: var(--ibk-link) !important;
+    }
+
+    /* Sidebar / Filters */
+    #changelist-filter {
+        background: var(--ibk-bg-secondary) !important;
+        border: 1px solid var(--ibk-border) !important;
+        border-radius: 8px !important;
+    }
+    #changelist-filter h2 {
+        color: var(--ibk-text-primary) !important;
+        background: var(--ibk-bg-tertiary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+    }
+    #changelist-filter h3 {
+        color: var(--ibk-text-primary) !important;
+    }
+    #changelist-filter li {
+        color: var(--ibk-text-secondary) !important;
+    }
+    #changelist-filter li a {
+        color: var(--ibk-text-secondary) !important;
+    }
+    #changelist-filter li.selected a {
+        color: var(--ibk-accent) !important;
+        font-weight: bold;
+    }
+
+    /* Forms */
+    .form-row {
+        border-bottom-color: var(--ibk-border) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    .form-row label {
+        color: var(--ibk-text-primary) !important;
+    }
+    .help, .help-text, p.help {
+        color: var(--ibk-text-secondary) !important;
+    }
+    fieldset {
+        background: var(--ibk-bg-secondary) !important;
+        border: 1px solid var(--ibk-border) !important;
+        border-radius: 8px !important;
+    }
+    fieldset h2 {
+        color: var(--ibk-text-primary) !important;
+        background: var(--ibk-bg-tertiary) !important;
+    }
+    .description {
+        color: var(--ibk-text-secondary) !important;
+    }
+
+    /* Inputs */
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="url"],
+    input[type="number"],
+    input[type="search"],
+    textarea,
+    select {
+        background: var(--ibk-bg-input) !important;
+        color: var(--ibk-text-primary) !important;
+        border: 1px solid var(--ibk-border) !important;
+        border-radius: 4px !important;
+        padding: 6px 8px !important;
+    }
+    input:focus, textarea:focus, select:focus {
+        border-color: var(--ibk-accent) !important;
+        outline: none !important;
+        box-shadow: 0 0 0 2px rgba(255, 0, 0, 0.2) !important;
+    }
+    select option {
+        background: var(--ibk-bg-secondary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+
+    /* Buttons */
+    .submit-row {
+        background: var(--ibk-bg-secondary) !important;
+        border-top: 1px solid var(--ibk-border) !important;
+        overflow: visible !important;
+    }
+    input[type="submit"], button, .button, a.button {
+        background: var(--ibk-accent) !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 6px !important;
+        padding: 8px 16px !important;
+        cursor: pointer !important;
+    }
+    input[type="submit"]:hover, button:hover, .button:hover, a.button:hover {
+        background: var(--ibk-accent-hover) !important;
+    }
+    .submit-row input.default {
+        background: var(--ibk-accent) !important;
+    }
+    .submit-row input.default:hover {
+        background: var(--ibk-accent-hover) !important;
+    }
+    a.deletelink, .deletelink {
+        color: var(--ibk-error) !important;
+    }
+    .button.cancel-link {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+
+    /* Links */
+    a:link, a:visited {
+        color: var(--ibk-link) !important;
+    }
+    a:hover {
+        color: var(--ibk-link-hover) !important;
+    }
+
+    /* Changelist actions */
+    #changelist .actions {
+        background: var(--ibk-bg-secondary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    #changelist .actions label {
+        color: var(--ibk-text-primary) !important;
+    }
+    #changelist .actions span.action-counter,
+    #changelist .actions span.all,
+    #changelist .actions span.clear,
+    #changelist .actions span.question {
+        color: var(--ibk-text-secondary) !important;
+    }
+
+    /* Pagination */
+    .paginator {
+        color: var(--ibk-text-secondary) !important;
+        background: var(--ibk-bg-secondary) !important;
+        border-top: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Messages */
+    .messagelist li {
+        border-radius: 6px !important;
+        margin-bottom: 8px !important;
+    }
+    .messagelist li.success {
+        background: rgba(76, 175, 80, 0.15) !important;
+        color: var(--ibk-success) !important;
+        border: 1px solid rgba(76, 175, 80, 0.3) !important;
+    }
+    .messagelist li.error {
+        background: rgba(239, 68, 68, 0.15) !important;
+        color: var(--ibk-error) !important;
+        border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    }
+    .messagelist li.warning {
+        background: rgba(255, 152, 0, 0.15) !important;
+        color: var(--ibk-warning) !important;
+        border: 1px solid rgba(255, 152, 0, 0.3) !important;
+    }
+    .messagelist li.info {
+        background: rgba(33, 150, 243, 0.15) !important;
+        color: var(--ibk-info) !important;
+        border: 1px solid rgba(33, 150, 243, 0.3) !important;
+    }
+
+    /* Error lists */
+    .errorlist li {
+        color: var(--ibk-error) !important;
+    }
+    ul.errorlist {
+        background: rgba(239, 68, 68, 0.1) !important;
+        border: 1px solid rgba(239, 68, 68, 0.3) !important;
+        border-radius: 4px !important;
+    }
+
+    /* Recent actions */
+    #recent-actions-module {
+        background: var(--ibk-bg-secondary) !important;
+        border: 1px solid var(--ibk-border) !important;
+        border-radius: 8px !important;
+    }
+    #recent-actions-module h2 {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    #recent-actions-module li {
+        color: var(--ibk-text-secondary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Object tools (Add / History buttons) */
+    .object-tools a {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+        border-radius: 6px !important;
+    }
+    .object-tools a:hover {
+        background: var(--ibk-accent) !important;
+        color: #fff !important;
+    }
+    .object-tools a.addlink {
+        background: var(--ibk-accent) !important;
+        color: #fff !important;
+    }
+
+    /* Checkbox */
+    .vCheckboxLabel {
+        color: var(--ibk-text-primary) !important;
+    }
+
+    /* Calendar & date widgets */
+    .calendarbox, .clockbox {
+        background: var(--ibk-bg-secondary) !important;
+        border: 1px solid var(--ibk-border) !important;
+    }
+    .calendar caption {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    .calendar td, .calendar th {
+        color: var(--ibk-text-primary) !important;
+    }
+    .calendar td a {
+        color: var(--ibk-link) !important;
+    }
+
+    /* Inline groups */
+    .inline-group {
+        background: var(--ibk-bg-secondary) !important;
+        border: 1px solid var(--ibk-border) !important;
+        border-radius: 8px !important;
+    }
+    .inline-group h2 {
+        background: var(--ibk-bg-tertiary) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    .inline-related {
+        background: var(--ibk-bg-primary) !important;
+        border: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Login page override */
+    body.login #container {
+        background: var(--ibk-bg-primary) !important;
+    }
+    body.login #header {
+        background: var(--ibk-bg-secondary) !important;
+    }
+    body.login #content {
+        background: var(--ibk-bg-secondary) !important;
+        border-radius: 8px !important;
+    }
+
+    /* Footer */
+    #footer {
+        background: var(--ibk-bg-secondary) !important;
+        color: var(--ibk-text-secondary) !important;
+        border-top: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Search bar */
+    #toolbar {
+        background: var(--ibk-bg-secondary) !important;
+        border-bottom: 1px solid var(--ibk-border) !important;
+        color: var(--ibk-text-primary) !important;
+    }
+    #searchbar {
+        background: var(--ibk-bg-input) !important;
+        color: var(--ibk-text-primary) !important;
+        border: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: var(--ibk-bg-primary);
+    }
+    ::-webkit-scrollbar-thumb {
+        background: var(--ibk-bg-tertiary);
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #404040;
+    }
+
+    /* Nav sidebar */
+    nav.sticky {
+        background: var(--ibk-bg-secondary) !important;
+    }
+    nav.sticky .module h2 {
+        background: var(--ibk-bg-tertiary) !important;
+    }
+    nav.sticky .module caption {
+        background: var(--ibk-bg-tertiary) !important;
+    }
+    .toggle-nav-sidebar {
+        background: var(--ibk-bg-secondary) !important;
+        color: var(--ibk-text-primary) !important;
+        border-right: 1px solid var(--ibk-border) !important;
+    }
+
+    /* Override Django's built-in dark mode detection (force our theme always) */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --primary: var(--ibk-accent);
+            --accent: var(--ibk-accent);
+            --secondary: var(--ibk-link);
+            --primary-fg: #fff;
+        }
+    }
+</style>
+{% endblock %}

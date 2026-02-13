@@ -144,6 +144,9 @@ BASE_URL = "http://localhost:8000" if ENVIRONMENT == "local" else os.getenv("BAS
 # Ensure BASE_URL doesn't end with a slash
 BASE_URL = BASE_URL.rstrip('/')
 
+# Twitch embed parent domain
+TWITCH_PARENT_DOMAIN = os.getenv('TWITCH_PARENT_DOMAIN', 'localhost' if ENVIRONMENT == 'local' else 'ibokki.com')
+
 # Auth settings
 LOGIN_URL = "/"
 LOGIN_REDIRECT_URL = "/home/"

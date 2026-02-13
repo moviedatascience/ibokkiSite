@@ -73,6 +73,11 @@
                         <a href="{% url 'invite' %}" class="dropdown-item">
                             <i class="fas fa-envelope mr-2"></i> Invite
                         </a>
+                        {% if user.is_staff %}
+                        <a href="/admin/" class="dropdown-item">
+                            <i class="fas fa-cog mr-2"></i> Admin Panel
+                        </a>
+                        {% endif %}
                         <div class="dropdown-divider"></div>
                         <form action="{% url 'logout' %}" method="post" class="inline">
                             {% csrf_token %}
