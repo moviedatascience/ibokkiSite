@@ -35,7 +35,7 @@ class StreamSettings(models.Model):
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
-    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
 
     def clean(self):
         # Ensure only one stream is featured
@@ -49,7 +49,8 @@ class StreamSettings(models.Model):
             raise ValidationError("YouTube channel ID is required for YouTube streams.")
 
     def save(self, *args, **kwargs):
-        self.full_clean()
+        if not kwargs.pop('skip_full_clean', False):
+            self.full_clean()
         super().save(*args, **kwargs)
 
     def get_youtube_live_stream_id(self):
