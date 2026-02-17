@@ -14,19 +14,31 @@ import logging
 logger = logging.getLogger(__name__)
 
 class CustomUser(AbstractUser):
+    ROLE_CHOICES = [
+        ('user', 'User'),
+        ('subscriber', 'Subscriber'),
+        ('moderator', 'Moderator'),
+        ('admin', 'Admin'),
+    ]
+
     email = models.EmailField(unique=True)
     display_name = models.CharField(max_length=100, unique=True, null=True, blank=True)
     invites_remaining = models.PositiveIntegerField(default=2)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
 
     def save(self, *args, **kwargs):
-        # If display_name is not set, default to username
         if not self.display_name:
             self.display_name = self.username
         super().save(*args, **kwargs)
 
+    @property
+    def is_moderator_or_above(self):
+        """Returns True if user is a moderator, admin, or Django staff."""
+        return self.role in ('moderator', 'admin') or self.is_staff
+
     def can_invite(self):
         """Check if user can send an invitation."""
-        if self.is_superuser:
+        if self.is_superuser or self.role == 'admin':
             return True
         return self.invites_remaining > 0
 
@@ -292,3 +304,144 @@ class Emote(models.Model):
 
     def __str__(self):
         return self.code
+
+
+class UserTimeout(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='timeouts_received'
+    )
+    stream_id = models.CharField(max_length=100, default='general')
+    timed_out_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='timeouts_given'
+    )
+    reason = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'stream_id', '-expires_at']),
+        ]
+
+    def __str__(self):
+        return f"Timeout: {self.user.username} in {self.stream_id} until {self.expires_at}"
+
+    @classmethod
+    def is_timed_out(cls, user, stream_id):
+        """Check if a user is currently timed out in a given stream."""
+        return cls.objects.filter(
+            user=user,
+            stream_id=stream_id,
+            expires_at__gt=timezone.now(),
+        ).exists()
+
+    @classmethod
+    def clear_timeout(cls, user, stream_id):
+        """Remove active timeouts for a user in a stream."""
+        cls.objects.filter(
+            user=user,
+            stream_id=stream_id,
+            expires_at__gt=timezone.now(),
+        ).delete()
+
+
+class UserBan(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bans_received'
+    )
+    banned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='bans_given'
+    )
+    reason = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    is_permanent = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        if self.is_permanent:
+            return f"Permanent ban: {self.user.username}"
+        return f"Ban: {self.user.username} until {self.expires_at}"
+
+    @classmethod
+    def is_banned(cls, user):
+        """Check if a user is currently banned."""
+        return cls.objects.filter(
+            user=user,
+        ).filter(
+            Q(is_permanent=True) | Q(expires_at__gt=timezone.now())
+        ).exists()
+
+    @classmethod
+    def clear_ban(cls, user):
+        """Remove all active bans for a user."""
+        cls.objects.filter(
+            user=user,
+        ).filter(
+            Q(is_permanent=True) | Q(expires_at__gt=timezone.now())
+        ).delete()
+
+
+class Poll(models.Model):
+    stream_id = models.CharField(max_length=100, default='general')
+    question = models.CharField(max_length=255)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='polls_created'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['stream_id', '-created_at']),
+        ]
+
+    def __str__(self):
+        status = 'active' if self.is_active else 'ended'
+        return f"Poll: {self.question[:50]} ({status})"
+
+    @classmethod
+    def get_active_poll(cls, stream_id):
+        """Get the currently active poll for a stream, if any."""
+        return cls.objects.filter(
+            stream_id=stream_id,
+            is_active=True,
+        ).first()
+
+
+class PollOption(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='options')
+    text = models.CharField(max_length=200)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f"{self.poll.question[:30]} - {self.text}"
+
+    @property
+    def vote_count(self):
+        return self.votes.count()
+
+
+class PollVote(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name='votes')
+    option = models.ForeignKey(PollOption, on_delete=models.CASCADE, related_name='votes')
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='poll_votes'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['poll', 'user'], name='unique_vote_per_user'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} voted '{self.option.text}' on '{self.poll.question[:30]}'"

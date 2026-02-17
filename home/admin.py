@@ -1,18 +1,21 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, StreamSettings, ChatMessage, Emote, Invitation, PasswordResetToken
+from .models import (
+    CustomUser, StreamSettings, ChatMessage, Emote, Invitation,
+    PasswordResetToken, UserTimeout, UserBan, Poll, PollOption, PollVote,
+)
 
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
-    list_display = ('username', 'display_name', 'email', 'invites_remaining', 'is_staff', 'is_active')
-    list_filter = ('is_staff', 'is_superuser', 'is_active')
+    list_display = ('username', 'display_name', 'email', 'role', 'invites_remaining', 'is_staff', 'is_active')
+    list_filter = ('role', 'is_staff', 'is_superuser', 'is_active')
     search_fields = ('username', 'display_name', 'email')
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal info', {'fields': ('display_name', 'first_name', 'last_name', 'email')}),
         ('Invitations', {'fields': ('invites_remaining',)}),
-        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Permissions', {'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
     add_fieldsets = (
@@ -93,6 +96,40 @@ class ChatMessageAdmin(admin.ModelAdmin):
 class EmoteAdmin(admin.ModelAdmin):
     list_display = ('code', 'is_animated')
     search_fields = ('code',)
+
+
+@admin.register(UserTimeout)
+class UserTimeoutAdmin(admin.ModelAdmin):
+    list_display = ('user', 'stream_id', 'timed_out_by', 'created_at', 'expires_at')
+    list_filter = ('stream_id',)
+    search_fields = ('user__username', 'timed_out_by__username')
+    readonly_fields = ('user', 'stream_id', 'timed_out_by', 'reason', 'created_at', 'expires_at')
+    ordering = ('-created_at',)
+
+
+@admin.register(UserBan)
+class UserBanAdmin(admin.ModelAdmin):
+    list_display = ('user', 'banned_by', 'is_permanent', 'created_at', 'expires_at')
+    list_filter = ('is_permanent',)
+    search_fields = ('user__username', 'banned_by__username')
+    readonly_fields = ('user', 'banned_by', 'reason', 'created_at', 'expires_at', 'is_permanent')
+    ordering = ('-created_at',)
+
+
+class PollOptionInline(admin.TabularInline):
+    model = PollOption
+    extra = 0
+    readonly_fields = ('text', 'order')
+
+
+@admin.register(Poll)
+class PollAdmin(admin.ModelAdmin):
+    list_display = ('question', 'stream_id', 'created_by', 'is_active', 'created_at', 'expires_at')
+    list_filter = ('is_active', 'stream_id')
+    search_fields = ('question', 'created_by__username')
+    readonly_fields = ('stream_id', 'question', 'created_by', 'created_at', 'expires_at')
+    ordering = ('-created_at',)
+    inlines = [PollOptionInline]
 
 
 # Customize admin site branding

@@ -18,6 +18,9 @@
     <button id="chat-side-toggle" class="text-sm text-youtube-primary hover:text-youtube-secondary">Move Chat</button>
 </div>
 
+<!-- Active Poll -->
+<div id="poll-container" class="px-4 pt-2"></div>
+
 <!-- Chat Messages -->
 <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-2 text-sm"></div>
 
@@ -28,7 +31,7 @@
         <button type="submit" class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">Send</button>
     </form>
     <div class="text-xs text-gray-400 mt-2">
-        Commands: /clear (staff only), /timeout username [seconds] (staff only)
+        Mod commands: /clear, /timeout user [sec], /untimeout user, /ban user [hours], /unban user, /poll Question | Opt1 | Opt2, /endpoll
     </div>
 </div>
 
@@ -51,6 +54,11 @@
 .chat-timeout {
     background-color: rgba(245, 158, 11, 0.1);
     border-left: 3px solid #f59e0b;
+    padding-left: 8px;
+}
+.chat-ban {
+    background-color: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid #ef4444;
     padding-left: 8px;
 }
 .inline-emote {
