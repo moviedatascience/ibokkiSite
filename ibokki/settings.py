@@ -78,12 +78,40 @@ WSGI_APPLICATION = "ibokki.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    import re
+    # Parse DATABASE_URL: postgres://USER:PASSWORD@HOST:PORT/DBNAME
+    m = re.match(
+        r'^postgres(?:ql)?://(?P<user>[^:]+):(?P<password>[^@]+)@(?P<host>[^:]+):(?P<port>\d+)/(?P<name>.+)$',
+        DATABASE_URL,
+    )
+    if m:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.postgresql",
+                "NAME": m.group("name"),
+                "USER": m.group("user"),
+                "PASSWORD": m.group("password"),
+                "HOST": m.group("host"),
+                "PORT": m.group("port"),
+            }
+        }
+    else:
+        DATABASES = {
+            "default": {
+                "ENGINE": "django.db.backends.sqlite3",
+                "NAME": BASE_DIR / "db.sqlite3",
+            }
+        }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     }
-}
 
 
 # Password validation
@@ -299,17 +327,7 @@ CONTENT_SECURITY_POLICY = {
     },
 }
 
-CSP_DEFAULT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["default-src"]
-CSP_SCRIPT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["script-src"]
-CSP_STYLE_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["style-src"]
-CSP_IMG_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["img-src"]
-CSP_FRAME_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["frame-src"]
-CSP_CONNECT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"]
-CSP_FONT_SRC = CONTENT_SECURITY_POLICY["DIRECTIVES"]["font-src"]
-
 # Enable CSP reporting in production
 if not DEBUG:
     CONTENT_SECURITY_POLICY["REPORT_ONLY"] = False
     CONTENT_SECURITY_POLICY["DIRECTIVES"]["report-uri"] = ("/csp-report/",)
-    CSP_REPORT_ONLY = False
-    CSP_REPORT_URI = ("/csp-report/",)
