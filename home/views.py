@@ -390,9 +390,6 @@ def watch(request):
     else:
         stream = featured_stream
 
-    if not stream and not active_streams.exists():
-        return redirect('landing')
-
     streams_dict = {}
     for s in active_streams:
         key = f"{s.platform}/{s.channel_slug}"

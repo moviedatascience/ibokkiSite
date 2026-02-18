@@ -12,15 +12,25 @@
     <!-- Main Column (Stream) -->
     <div id="stream-area" class="flex-grow h-full flex flex-col min-h-0 min-w-0">
         <div class="flex-grow bg-black min-h-0 min-w-0 flex items-center justify-center">
+            {% if embed_url %}
             <div class="relative w-full h-full max-h-[calc(100vh-3.5rem)] flex items-center justify-center">
                 <div class="w-full h-full flex items-center justify-center">
-                    <iframe src="{{ embed_url|default:'' }}"
+                    <iframe src="{{ embed_url }}"
                             class="w-full h-full"
                             allowfullscreen
                             sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
                             style="border: none;"></iframe>
                 </div>
             </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center text-center p-8">
+                <svg class="w-16 h-16 text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <h2 class="text-xl font-semibold text-gray-400 mb-2">No streams are currently live</h2>
+                <p class="text-gray-500 text-sm">Check back later or visit the <a href="{% url 'landing' %}" class="text-blue-400 hover:underline">home page</a>.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -77,18 +87,17 @@
     const streams = JSON.parse('{{ streams_json|escapejs }}');
     const selectEls = document.querySelectorAll('#stream-select');
     const iframe = document.querySelector('iframe');
-    let currentStreamKey = '{{ current_stream.platform }}/{{ current_stream.channel_slug }}';
+    let currentStreamKey = {% if current_stream %}'{{ current_stream.platform }}/{{ current_stream.channel_slug }}'{% else %}''{% endif %};
 
     selectEls.forEach(select => {
         select.addEventListener('change', function() {
             const streamKey = this.value;
             const stream = streams[streamKey];
-            if (stream && stream.embed_url) {
+            if (stream && stream.embed_url && iframe) {
                 iframe.src = stream.embed_url;
                 window.location.hash = '#' + streamKey;
                 currentStreamKey = streamKey;
-                
-                // Switch chat to new stream
+
                 const streamId = streamKey.replace('/', '_');
                 if (window.chatUI && window.chatUI.chatClient) {
                     window.chatUI.chatClient.switchStream(streamId);
@@ -101,19 +110,11 @@
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
-    
-    console.log('Chat elements found:', {
-        chatMessages: !!chatMessages,
-        chatForm: !!chatForm,
-        chatInput: !!chatInput
-    });
 
-    // Initialize chat client
     let chatClient = null;
     let chatUI = null;
 
     if (chatMessages && chatForm && chatInput) {
-        // Create chat client with options
         chatClient = new ChatClient({
             reconnectInterval: 1000,
             maxReconnectAttempts: 10,
@@ -121,28 +122,19 @@
             pongTimeout: 10000
         });
 
-        // Create chat UI manager
         chatUI = new ChatUI(chatClient, {
             maxMessages: 100
         });
 
-        // Initialize UI
         if (chatUI.init('#chat-messages', '#chat-form', '#chat-input')) {
-            // Connect to current stream's chat
             const initialStreamId = currentStreamKey ? currentStreamKey.replace('/', '_') : 'general';
             chatClient.connect(initialStreamId);
-            
-            // Make globally accessible for stream switching
+
             window.chatUI = chatUI;
             window.chatClient = chatClient;
-        } else {
-            console.error('Failed to initialize chat UI');
         }
-    } else {
-        console.warn('Chat elements not found, chat will not be initialized');
     }
 
-    // Clean up on page unload
     window.addEventListener('beforeunload', () => {
         if (chatClient) {
             chatClient.disconnect();
