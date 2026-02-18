@@ -45,6 +45,7 @@ class ChatClient {
         this.onPollStart = null;
         this.onPollUpdate = null;
         this.onPollEnd = null;
+        this.onInfo = null;
     }
 
     connect(streamId = 'general') {
@@ -146,6 +147,12 @@ class ChatClient {
                     }
                     break;
 
+                case 'info':
+                    if (this.onInfo) {
+                        this.onInfo(data.message);
+                    }
+                    break;
+
                 case 'ping':
                     this.send({
                         type: 'pong',
@@ -157,27 +164,6 @@ class ChatClient {
                     if (this.pongTimeout) {
                         clearTimeout(this.pongTimeout);
                         this.pongTimeout = null;
-                    }
-                    break;
-
-                default:
-                    if (data.history) {
-                        if (this.onHistory) {
-                            this.onHistory(data.history);
-                        }
-                    } else if (data.message) {
-                        if (this.onMessage) {
-                            this.onMessage(data);
-                        }
-                    } else if (data.command === 'clear') {
-                        if (this.onClear) {
-                            this.onClear();
-                        }
-                    } else if (data.error) {
-                        console.error('Chat error:', data.error);
-                        if (this.onError) {
-                            this.onError(data.error);
-                        }
                     }
                     break;
             }
@@ -371,6 +357,10 @@ class ChatUI {
             this.showError(error);
         };
 
+        this.chatClient.onInfo = (message) => {
+            this.showInfo(message);
+        };
+
         this.chatClient.onConnected = () => {
             this.updateStatus('connected');
         };
@@ -468,6 +458,17 @@ class ChatUI {
         errorDiv.textContent = `Error: ${error}`;
 
         this.messageContainer.appendChild(errorDiv);
+        this.scrollToBottom();
+    }
+
+    showInfo(message) {
+        if (!this.messageContainer) return;
+
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'chat-info text-blue-400 py-1 italic';
+        infoDiv.textContent = message;
+
+        this.messageContainer.appendChild(infoDiv);
         this.scrollToBottom();
     }
 

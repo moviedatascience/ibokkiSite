@@ -1,10 +1,9 @@
 from django.db import models
-from django.contrib.auth.models import User, AbstractUser
+from django.contrib.auth.models import AbstractUser
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
-import json
 import hashlib
 import secrets
 from datetime import timedelta
@@ -155,8 +154,6 @@ class PasswordResetToken(models.Model):
         except cls.DoesNotExist:
             pass
         return None
-
-# Create your models here.
 
 class StreamSettings(models.Model):
     PLATFORM_CHOICES = [

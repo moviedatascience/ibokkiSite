@@ -1,13 +1,13 @@
 import json
 import time
 import asyncio
+import urllib.parse
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from .models import ChatMessage, Emote, UserTimeout, UserBan, Poll, PollOption, PollVote
 from django.utils.html import escape
-from django.utils.safestring import mark_safe
 from django.utils import timezone
 from datetime import timedelta
 from django.db import IntegrityError
@@ -29,7 +29,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if self.stream_id == 'general':
             query_string = self.scope.get('query_string', b'').decode()
             if 'stream=' in query_string:
-                import urllib.parse
                 params = urllib.parse.parse_qs(query_string)
                 if 'stream' in params:
                     self.stream_id = params['stream'][0]
@@ -247,7 +246,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
             return
 
-        if command.startswith('/clear'):
+        cmd = command.split()[0] if command.split() else command
+
+        if cmd == '/clear':
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -256,22 +257,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
 
-        elif command.startswith('/timeout'):
-            await self._handle_timeout_command(command, user)
-
-        elif command.startswith('/untimeout'):
+        elif cmd == '/untimeout':
             await self._handle_untimeout_command(command, user)
 
-        elif command.startswith('/ban'):
-            await self._handle_ban_command(command, user)
+        elif cmd == '/timeout':
+            await self._handle_timeout_command(command, user)
 
-        elif command.startswith('/unban'):
+        elif cmd == '/unban':
             await self._handle_unban_command(command, user)
 
-        elif command.startswith('/endpoll'):
+        elif cmd == '/ban':
+            await self._handle_ban_command(command, user)
+
+        elif cmd == '/endpoll':
             await self._handle_endpoll_command(user)
 
-        elif command.startswith('/poll '):
+        elif cmd == '/poll':
             await self._handle_poll_command(command, user)
 
     async def _handle_timeout_command(self, command, user):
@@ -345,8 +346,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await database_sync_to_async(UserTimeout.clear_timeout)(target_user, self.stream_id)
 
         await self.send(text_data=json.dumps({
-            'type': 'error',
-            'error': f'{username} timeout has been cleared'
+            'type': 'info',
+            'message': f'{username} timeout has been cleared'
         }))
 
     async def _handle_ban_command(self, command, user):
@@ -427,8 +428,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await database_sync_to_async(UserBan.clear_ban)(target_user)
 
         await self.send(text_data=json.dumps({
-            'type': 'error',
-            'error': f'{username} has been unbanned'
+            'type': 'info',
+            'message': f'{username} has been unbanned'
         }))
 
     async def _handle_poll_command(self, command, user):
