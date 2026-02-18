@@ -16,7 +16,7 @@ def reverse_admin_role(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("home", "0005_user_roles_and_moderation"),
+        ("home", "0006_user_roles_and_moderation"),
     ]
 
     operations = [
