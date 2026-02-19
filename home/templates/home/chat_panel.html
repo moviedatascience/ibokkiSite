@@ -10,12 +10,22 @@
 </div>
 
 <!-- Header -->
-<div class="p-4 border-b border-youtube-primary flex justify-between items-center">
-    <div class="flex items-center gap-2">
-        <h2 class="text-youtube-primary font-semibold">Chat</h2>
-        <span id="chat-status" class="status-indicator disconnected text-lg">○</span>
+<div class="px-3 py-2 border-b border-youtube-primary flex justify-between items-center">
+    <h2 class="text-youtube-primary font-semibold text-sm">Chat</h2>
+    <div class="flex items-center gap-1">
+        <!-- Swap sides -->
+        <button id="chat-side-toggle" class="p-1.5 text-gray-400 hover:text-white rounded transition-colors" title="Swap chat side">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+        </button>
+        <!-- Pop-out -->
+        <button id="chat-popout-btn" class="p-1.5 text-gray-400 hover:text-white rounded transition-colors" title="Pop out chat">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        </button>
+        <!-- Collapse -->
+        <button id="chat-collapse-btn" class="p-1.5 text-gray-400 hover:text-white rounded transition-colors" title="Collapse chat">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+        </button>
     </div>
-    <button id="chat-side-toggle" class="text-sm text-youtube-primary hover:text-youtube-secondary">Move Chat</button>
 </div>
 
 <!-- Active Poll -->
@@ -36,12 +46,6 @@
 </div>
 
 <style>
-.status-indicator.connected {
-    color: #10b981; /* green */
-}
-.status-indicator.disconnected {
-    color: #ef4444; /* red */
-}
 .chat-message {
     word-wrap: break-word;
     overflow-wrap: break-word;

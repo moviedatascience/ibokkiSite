@@ -410,6 +410,11 @@ def watch(request):
         'streams_json': json.dumps(streams_dict, cls=DjangoJSONEncoder),
         'CHAT_MESSAGE_MAX_LENGTH': settings.CHAT_MESSAGE_MAX_LENGTH,
     }
+
+    if request.GET.get('popout_chat'):
+        context['stream_id'] = request.GET.get('stream_id', 'general')
+        return render(request, 'home/chat_popout.html', context)
+
     return render(request, 'home/watch.html', context)
 
 

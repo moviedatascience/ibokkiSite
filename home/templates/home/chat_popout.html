@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ibokki Chat</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body { height: 100%; margin: 0; }
+        body { background-color: #272727; color: #f1f1f1; }
+        .bg-youtube-primary { background-color: #181818; }
+        .bg-youtube-secondary { background-color: #272727; }
+        .text-youtube-primary { color: #f1f1f1; }
+        .text-youtube-secondary { color: #aaaaaa; }
+        .border-youtube-primary { border-color: #3f3f3f; }
+    </style>
+</head>
+<body class="flex flex-col h-full">
+    {% load static %}
+    {% include "home/chat_panel.html" %}
+
+    <script src="{% static 'home/js/chat.js' %}"></script>
+    <script>
+        // Hide buttons not relevant in pop-out mode
+        const sideToggle = document.getElementById('chat-side-toggle');
+        const popoutBtn = document.getElementById('chat-popout-btn');
+        const collapseBtn = document.getElementById('chat-collapse-btn');
+        if (sideToggle) sideToggle.style.display = 'none';
+        if (popoutBtn) popoutBtn.style.display = 'none';
+        if (collapseBtn) collapseBtn.style.display = 'none';
+
+        const chatMessages = document.getElementById('chat-messages');
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+
+        if (chatMessages && chatForm && chatInput) {
+            const chatClient = new ChatClient({
+                reconnectInterval: 1000,
+                maxReconnectAttempts: 10,
+                pingInterval: 30000,
+                pongTimeout: 10000
+            });
+
+            const chatUI = new ChatUI(chatClient, { maxMessages: 100 });
+
+            if (chatUI.init('#chat-messages', '#chat-form', '#chat-input')) {
+                const streamId = '{{ stream_id|escapejs }}' || 'general';
+                chatClient.connect(streamId);
+                window.chatUI = chatUI;
+                window.chatClient = chatClient;
+            }
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (window.chatClient) window.chatClient.disconnect();
+        });
+    </script>
+</body>
+</html>

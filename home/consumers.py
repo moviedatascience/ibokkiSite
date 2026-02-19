@@ -101,6 +101,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'type': 'error',
                 'error': 'Invalid message format'
             }))
+        except Exception as e:
+            logger.error(f"Unhandled error in receive: {e}", exc_info=True)
+            try:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'error': f'Server error: {e}'
+                }))
+            except Exception:
+                pass
 
     async def switch_stream(self, new_stream_id):
         """Handle switching to a different stream chat"""
@@ -479,6 +488,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self._deactivate_polls()
             poll_data = await self._create_poll(question, options, user, duration)
 
+            display_name = user.display_name or user.username
+
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
@@ -487,6 +498,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'question': poll_data['question'],
                     'options': poll_data['options'],
                     'expires_at': poll_data['expires_at'],
+                    'created_by': display_name,
+                    'duration': duration,
                     'stream_id': self.stream_id,
                 }
             )
@@ -595,6 +608,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'question': event['question'],
             'options': event['options'],
             'expires_at': event['expires_at'],
+            'created_by': event.get('created_by', ''),
+            'duration': event.get('duration', 60),
             'stream_id': event.get('stream_id', self.stream_id),
         }))
 
@@ -747,6 +762,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'question': poll_data['question'],
                 'options': poll_data['options'],
                 'expires_at': poll_data['expires_at'],
+                'created_by': poll_data.get('created_by', ''),
+                'duration': poll_data.get('duration', 60),
                 'stream_id': self.stream_id,
             }))
 
@@ -764,11 +781,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             total_votes += count
             options.append({'id': opt.id, 'text': opt.text, 'votes': count})
 
+        duration = int((poll.expires_at - poll.created_at).total_seconds())
+        creator = poll.created_by
+        created_by = creator.display_name or creator.username if creator else ''
+
         return {
             'poll_id': poll.id,
             'question': poll.question,
             'options': options,
             'expires_at': poll.expires_at.timestamp(),
+            'created_by': created_by,
+            'duration': duration,
         }
 
     async def parse_emotes(self, message):

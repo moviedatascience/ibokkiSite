@@ -496,101 +496,93 @@ class ChatUI {
 
     // --- Poll UI ---
 
+    _pollBarColors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#e84393', '#00cec9', '#fd79a8'];
+
     showPoll(data) {
         if (!this.pollContainer) return;
 
         this.activePollId = data.poll_id;
         this.hasVoted = false;
-        this._selectedOptionId = null;
 
         const expiresAt = data.expires_at * 1000;
+        const createdBy = data.created_by || 'Unknown';
+        const duration = data.duration || 60;
+        const totalVotes = data.options.reduce((sum, o) => sum + (o.votes || 0), 0);
 
         let optionsHtml = '';
-        data.options.forEach(opt => {
+        data.options.forEach((opt, i) => {
+            const color = this._pollBarColors[i % this._pollBarColors.length];
+            const pct = totalVotes > 0 ? Math.round((opt.votes || 0) / totalVotes * 100) : 0;
+            const votes = opt.votes || 0;
             optionsHtml += `
-                <label class="poll-option flex items-center w-full px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 transition-colors text-sm text-white relative overflow-hidden cursor-pointer"
-                       data-option-id="${opt.id}" data-poll-id="${data.poll_id}">
-                    <div class="poll-bar absolute inset-0 bg-blue-500 opacity-20 rounded" style="width: 0%"></div>
-                    <div class="relative flex items-center justify-between w-full">
-                        <div class="flex items-center gap-2">
-                            <input type="radio" name="poll-${data.poll_id}" value="${opt.id}"
-                                   class="poll-radio accent-blue-500 w-4 h-4 flex-shrink-0">
-                            <span class="poll-option-text">${this._escapeHtml(opt.text)}</span>
-                        </div>
-                        <span class="poll-vote-count text-gray-400 text-xs ml-2">${opt.votes || 0}</span>
+                <div class="poll-option cursor-pointer hover:brightness-125 transition-all" data-option-id="${opt.id}" data-poll-id="${data.poll_id}">
+                    <div class="flex justify-between text-xs text-gray-300 mb-0.5 px-1">
+                        <span><span class="font-bold text-white">${i + 1}</span> ${this._escapeHtml(opt.text)}</span>
+                        <span class="poll-vote-info">${pct}% (${votes} vote${votes !== 1 ? 's' : ''})</span>
                     </div>
-                </label>
+                    <div class="w-full bg-gray-700 rounded-sm h-5 overflow-hidden">
+                        <div class="poll-bar h-full rounded-sm transition-all duration-300" style="width: ${pct}%; background-color: ${color};"></div>
+                    </div>
+                </div>
             `;
         });
 
         this.pollContainer.innerHTML = `
-            <div class="poll-widget bg-gray-800 border border-gray-600 rounded-lg p-3 mb-2">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-yellow-400 font-bold text-sm">POLL</span>
-                    <span class="poll-timer text-gray-400 text-xs" id="poll-timer"></span>
+            <div class="poll-widget bg-[#1a1a2e] border border-gray-700 rounded p-3 mb-1">
+                <div class="flex justify-between items-start mb-1">
+                    <p class="text-white text-sm font-bold leading-tight">${this._escapeHtml(data.question)}</p>
+                    <button class="poll-dismiss text-gray-500 hover:text-white ml-2 text-lg leading-none flex-shrink-0" title="Dismiss">&times;</button>
                 </div>
-                <p class="text-white text-sm font-semibold mb-3">${this._escapeHtml(data.question)}</p>
-                <div class="poll-options space-y-2">
+                <p class="text-gray-400 text-xs mb-2">Poll started by ${this._escapeHtml(createdBy)} for ${duration} seconds. <span class="poll-total-votes">${totalVotes}</span> votes</p>
+                <div class="poll-options space-y-1.5">
                     ${optionsHtml}
                 </div>
-                <button class="poll-submit-btn w-full mt-3 px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled>
-                    Vote
-                </button>
+                <div class="text-right mt-1">
+                    <span class="poll-timer text-gray-500 text-xs" id="poll-timer"></span>
+                </div>
             </div>
         `;
 
-        const submitBtn = this.pollContainer.querySelector('.poll-submit-btn');
-
-        this.pollContainer.querySelectorAll('.poll-option').forEach(label => {
-            label.addEventListener('click', () => {
-                if (this.hasVoted) return;
-                this._selectedOptionId = parseInt(label.dataset.optionId);
-                submitBtn.disabled = false;
-                this.pollContainer.querySelectorAll('.poll-option').forEach(l => {
-                    l.classList.remove('ring-2', 'ring-blue-400');
-                });
-                label.classList.add('ring-2', 'ring-blue-400');
-            });
+        this.pollContainer.querySelector('.poll-dismiss').addEventListener('click', () => {
+            this.pollContainer.innerHTML = '';
+            if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
         });
 
-        submitBtn.addEventListener('click', () => {
-            if (this.hasVoted || this._selectedOptionId === null) return;
-            this.chatClient.sendVote(data.poll_id, this._selectedOptionId);
-            this.hasVoted = true;
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Voted';
-            this.pollContainer.querySelectorAll('.poll-option').forEach(l => {
-                l.classList.add('cursor-default');
-                l.classList.remove('hover:bg-gray-600');
-                const radio = l.querySelector('.poll-radio');
-                if (radio) radio.disabled = true;
+        this.pollContainer.querySelectorAll('.poll-option').forEach(el => {
+            el.addEventListener('click', () => {
+                if (this.hasVoted) return;
+                const optionId = parseInt(el.dataset.optionId);
+                const pollId = parseInt(el.dataset.pollId);
+                this.chatClient.sendVote(pollId, optionId);
+                this.hasVoted = true;
+                this.pollContainer.querySelectorAll('.poll-option').forEach(o => {
+                    o.classList.remove('hover:brightness-125');
+                    o.style.cursor = 'default';
+                });
+                el.style.outline = '2px solid white';
+                el.style.outlineOffset = '-2px';
+                el.style.borderRadius = '2px';
             });
         });
 
         this._startPollTimer(expiresAt);
-
-        const totalVotes = data.options.reduce((sum, o) => sum + (o.votes || 0), 0);
-        if (totalVotes > 0) {
-            this._updatePollBars(data.options, totalVotes);
-        }
     }
 
     updatePollResults(data) {
         if (!this.pollContainer || data.poll_id !== this.activePollId) return;
 
         const totalVotes = data.total_votes || 0;
-        data.results.forEach(opt => {
-            const btn = this.pollContainer.querySelector(`[data-option-id="${opt.id}"]`);
-            if (btn) {
-                const countEl = btn.querySelector('.poll-vote-count');
-                const barEl = btn.querySelector('.poll-bar');
-                if (countEl) countEl.textContent = opt.votes;
-                if (barEl) {
-                    const pct = totalVotes > 0 ? (opt.votes / totalVotes * 100) : 0;
-                    barEl.style.width = pct + '%';
-                }
-            }
+        const totalEl = this.pollContainer.querySelector('.poll-total-votes');
+        if (totalEl) totalEl.textContent = totalVotes;
+
+        data.results.forEach((opt, i) => {
+            const el = this.pollContainer.querySelector(`[data-option-id="${opt.id}"]`);
+            if (!el) return;
+            const pct = totalVotes > 0 ? Math.round(opt.votes / totalVotes * 100) : 0;
+            const infoEl = el.querySelector('.poll-vote-info');
+            const barEl = el.querySelector('.poll-bar');
+            if (infoEl) infoEl.textContent = `${pct}% (${opt.votes} vote${opt.votes !== 1 ? 's' : ''})`;
+            if (barEl) barEl.style.width = pct + '%';
         });
     }
 
@@ -607,52 +599,44 @@ class ChatUI {
         const totalVotes = data.results.reduce((sum, o) => sum + o.votes, 0);
 
         let resultsHtml = '';
-        data.results.forEach(opt => {
+        data.results.forEach((opt, i) => {
+            const color = this._pollBarColors[i % this._pollBarColors.length];
             const pct = totalVotes > 0 ? Math.round(opt.votes / totalVotes * 100) : 0;
             resultsHtml += `
-                <div class="w-full px-3 py-2 rounded bg-gray-700 text-sm text-white relative overflow-hidden">
-                    <div class="absolute inset-0 bg-green-500 opacity-20 rounded" style="width: ${pct}%"></div>
-                    <div class="relative flex justify-between items-center">
-                        <span>${this._escapeHtml(opt.text)}</span>
-                        <span class="text-gray-300 text-xs ml-2">${opt.votes} (${pct}%)</span>
+                <div>
+                    <div class="flex justify-between text-xs text-gray-300 mb-0.5 px-1">
+                        <span><span class="font-bold text-white">${i + 1}</span> ${this._escapeHtml(opt.text)}</span>
+                        <span>${pct}% (${opt.votes} vote${opt.votes !== 1 ? 's' : ''})</span>
+                    </div>
+                    <div class="w-full bg-gray-700 rounded-sm h-5 overflow-hidden">
+                        <div class="h-full rounded-sm" style="width: ${pct}%; background-color: ${color};"></div>
                     </div>
                 </div>
             `;
         });
 
         this.pollContainer.innerHTML = `
-            <div class="poll-widget bg-gray-800 border border-gray-600 rounded-lg p-3 mb-2">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-yellow-400 font-bold text-sm">POLL ENDED</span>
-                    <span class="text-gray-400 text-xs">${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</span>
+            <div class="poll-widget bg-[#1a1a2e] border border-gray-700 rounded p-3 mb-1">
+                <div class="flex justify-between items-start mb-1">
+                    <p class="text-white text-sm font-bold leading-tight">${this._escapeHtml(data.question)}</p>
+                    <button class="poll-dismiss text-gray-500 hover:text-white ml-2 text-lg leading-none flex-shrink-0" title="Dismiss">&times;</button>
                 </div>
-                <p class="text-white text-sm font-semibold mb-3">${this._escapeHtml(data.question)}</p>
-                <div class="space-y-2">
+                <p class="text-gray-400 text-xs mb-2">Poll ended. ${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</p>
+                <div class="space-y-1.5">
                     ${resultsHtml}
                 </div>
             </div>
         `;
 
+        this.pollContainer.querySelector('.poll-dismiss').addEventListener('click', () => {
+            this.pollContainer.innerHTML = '';
+        });
+
         setTimeout(() => {
             if (this.pollContainer && !this.activePollId) {
                 this.pollContainer.innerHTML = '';
             }
-        }, 15000);
-    }
-
-    _updatePollBars(options, totalVotes) {
-        options.forEach(opt => {
-            const btn = this.pollContainer.querySelector(`[data-option-id="${opt.id}"]`);
-            if (btn) {
-                const countEl = btn.querySelector('.poll-vote-count');
-                const barEl = btn.querySelector('.poll-bar');
-                if (countEl) countEl.textContent = opt.votes;
-                if (barEl) {
-                    const pct = totalVotes > 0 ? (opt.votes / totalVotes * 100) : 0;
-                    barEl.style.width = pct + '%';
-                }
-            }
-        });
+        }, 30000);
     }
 
     _startPollTimer(expiresAt) {
@@ -667,7 +651,7 @@ class ChatUI {
             const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
             const mins = Math.floor(remaining / 60);
             const secs = remaining % 60;
-            timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+            timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')} remaining`;
 
             if (remaining <= 0) {
                 clearInterval(this.pollTimer);

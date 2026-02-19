@@ -34,6 +34,11 @@
         </div>
     </div>
 
+    <!-- Chat expand tab (shown when chat is collapsed) -->
+    <button id="chat-expand-btn" class="hidden fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-youtube-secondary border border-gray-700 border-r-0 rounded-l-md px-1 py-4 text-gray-400 hover:text-white transition-colors" title="Expand chat">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+    </button>
+
     <!-- Right Chat Panel -->
     <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
@@ -44,42 +49,96 @@
 {% block extra_js %}
 <script src="{% static 'home/js/chat.js' %}"></script>
 <script>
-    // Chat side toggle logic (desktop only)
+    // --- Chat panel state ---
     let chatOnRight = true;
+    let chatCollapsed = false;
+    let chatPopoutWindow = null;
+
     const chatLeft = document.getElementById('chat-left');
     const chatRight = document.getElementById('chat-right');
-    const moveChatBtns = document.querySelectorAll('#chat-side-toggle');
+    const chatExpandBtn = document.getElementById('chat-expand-btn');
 
     function isDesktop() {
         return window.matchMedia('(min-width: 768px)').matches;
     }
 
+    function getActivePanel() {
+        return (!isDesktop() || chatOnRight) ? chatRight : chatLeft;
+    }
+
     function updateChatPosition() {
-        const target = (!isDesktop() || chatOnRight) ? chatRight : chatLeft;
+        if (chatCollapsed) return;
+        const target = getActivePanel();
         const source = (target === chatRight) ? chatLeft : chatRight;
 
-        // Move chat panel content to the target container
         if (target.children.length === 0 && source.children.length > 0) {
             while (source.firstChild) {
                 target.appendChild(source.firstChild);
             }
         }
 
-        // Show target, hide source
         target.classList.remove('hidden');
         source.classList.add('hidden');
     }
 
-    moveChatBtns.forEach(btn => {
+    // Swap sides
+    document.querySelectorAll('#chat-side-toggle').forEach(btn => {
         btn.addEventListener('click', function() {
-            if (isDesktop()) {
+            if (isDesktop() && !chatCollapsed) {
                 chatOnRight = !chatOnRight;
                 updateChatPosition();
             }
         });
     });
 
-    // Initialize position
+    // Collapse chat
+    document.querySelectorAll('#chat-collapse-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            chatCollapsed = true;
+            chatLeft.classList.add('hidden');
+            chatRight.classList.add('hidden');
+            chatExpandBtn.classList.remove('hidden');
+        });
+    });
+
+    // Expand chat
+    chatExpandBtn.addEventListener('click', function() {
+        chatCollapsed = false;
+        chatExpandBtn.classList.add('hidden');
+        updateChatPosition();
+    });
+
+    // Pop-out chat
+    document.querySelectorAll('#chat-popout-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (chatPopoutWindow && !chatPopoutWindow.closed) {
+                chatPopoutWindow.focus();
+                return;
+            }
+
+            const streamId = (window.chatClient && window.chatClient.currentStreamId) || 'general';
+            const popoutUrl = '{% url "watch" %}?popout_chat=1&stream_id=' + encodeURIComponent(streamId);
+            chatPopoutWindow = window.open(popoutUrl, 'ibokki_chat', 'width=400,height=700,resizable=yes,scrollbars=no');
+
+            // Collapse the inline chat
+            chatCollapsed = true;
+            chatLeft.classList.add('hidden');
+            chatRight.classList.add('hidden');
+            chatExpandBtn.classList.remove('hidden');
+
+            // Restore inline chat when pop-out closes
+            const checkClosed = setInterval(() => {
+                if (chatPopoutWindow && chatPopoutWindow.closed) {
+                    clearInterval(checkClosed);
+                    chatPopoutWindow = null;
+                    chatCollapsed = false;
+                    chatExpandBtn.classList.add('hidden');
+                    updateChatPosition();
+                }
+            }, 500);
+        });
+    });
+
     updateChatPosition();
     window.addEventListener('resize', updateChatPosition);
 
@@ -106,7 +165,7 @@
         });
     });
 
-    // --- Enhanced WebSocket Chat Integration ---
+    // --- WebSocket Chat Integration ---
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
