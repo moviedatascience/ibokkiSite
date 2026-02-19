@@ -501,20 +501,25 @@ class ChatUI {
 
         this.activePollId = data.poll_id;
         this.hasVoted = false;
+        this._selectedOptionId = null;
 
         const expiresAt = data.expires_at * 1000;
 
         let optionsHtml = '';
         data.options.forEach(opt => {
             optionsHtml += `
-                <button class="poll-option-btn w-full text-left px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 transition-colors text-sm text-white relative overflow-hidden"
-                        data-option-id="${opt.id}" data-poll-id="${data.poll_id}">
+                <label class="poll-option flex items-center w-full px-3 py-2 rounded bg-gray-700 hover:bg-gray-600 transition-colors text-sm text-white relative overflow-hidden cursor-pointer"
+                       data-option-id="${opt.id}" data-poll-id="${data.poll_id}">
                     <div class="poll-bar absolute inset-0 bg-blue-500 opacity-20 rounded" style="width: 0%"></div>
-                    <div class="relative flex justify-between items-center">
-                        <span class="poll-option-text">${this._escapeHtml(opt.text)}</span>
+                    <div class="relative flex items-center justify-between w-full">
+                        <div class="flex items-center gap-2">
+                            <input type="radio" name="poll-${data.poll_id}" value="${opt.id}"
+                                   class="poll-radio accent-blue-500 w-4 h-4 flex-shrink-0">
+                            <span class="poll-option-text">${this._escapeHtml(opt.text)}</span>
+                        </div>
                         <span class="poll-vote-count text-gray-400 text-xs ml-2">${opt.votes || 0}</span>
                     </div>
-                </button>
+                </label>
             `;
         });
 
@@ -528,27 +533,43 @@ class ChatUI {
                 <div class="poll-options space-y-2">
                     ${optionsHtml}
                 </div>
+                <button class="poll-submit-btn w-full mt-3 px-3 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        disabled>
+                    Vote
+                </button>
             </div>
         `;
 
-        this.pollContainer.querySelectorAll('.poll-option-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+        const submitBtn = this.pollContainer.querySelector('.poll-submit-btn');
+
+        this.pollContainer.querySelectorAll('.poll-option').forEach(label => {
+            label.addEventListener('click', () => {
                 if (this.hasVoted) return;
-                const optionId = parseInt(btn.dataset.optionId);
-                const pollId = parseInt(btn.dataset.pollId);
-                this.chatClient.sendVote(pollId, optionId);
-                this.hasVoted = true;
-                this.pollContainer.querySelectorAll('.poll-option-btn').forEach(b => {
-                    b.classList.remove('hover:bg-gray-600');
-                    b.classList.add('cursor-default');
+                this._selectedOptionId = parseInt(label.dataset.optionId);
+                submitBtn.disabled = false;
+                this.pollContainer.querySelectorAll('.poll-option').forEach(l => {
+                    l.classList.remove('ring-2', 'ring-blue-400');
                 });
-                btn.classList.add('ring-2', 'ring-blue-400');
+                label.classList.add('ring-2', 'ring-blue-400');
+            });
+        });
+
+        submitBtn.addEventListener('click', () => {
+            if (this.hasVoted || this._selectedOptionId === null) return;
+            this.chatClient.sendVote(data.poll_id, this._selectedOptionId);
+            this.hasVoted = true;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Voted';
+            this.pollContainer.querySelectorAll('.poll-option').forEach(l => {
+                l.classList.add('cursor-default');
+                l.classList.remove('hover:bg-gray-600');
+                const radio = l.querySelector('.poll-radio');
+                if (radio) radio.disabled = true;
             });
         });
 
         this._startPollTimer(expiresAt);
 
-        // If options already have votes (reconnecting to active poll), show results
         const totalVotes = data.options.reduce((sum, o) => sum + (o.votes || 0), 0);
         if (totalVotes > 0) {
             this._updatePollBars(data.options, totalVotes);

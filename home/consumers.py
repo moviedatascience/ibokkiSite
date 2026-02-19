@@ -433,20 +433,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }))
 
     async def _handle_poll_command(self, command, user):
-        """Handle /poll Question? | Option1 | Option2 | Option3"""
-        # Remove the '/poll ' prefix
-        content = command[6:].strip()
+        """Handle /poll [seconds] Question | Option1 | Option2 [| ...]"""
+        content = command[len('/poll'):].strip()
         parts = [p.strip() for p in content.split('|')]
 
         if len(parts) < 3:
             await self.send(text_data=json.dumps({
                 'type': 'error',
-                'error': 'Usage: /poll Question | Option1 | Option2 [| Option3 ...]'
+                'error': 'Usage: /poll [seconds] Question | Option1 | Option2 [| ...]'
             }))
             return
 
-        question = parts[0]
+        # Check if the question part starts with a number (duration in seconds)
+        question_part = parts[0]
+        duration = 60
+        tokens = question_part.split(None, 1)
+        if len(tokens) >= 2 and tokens[0].isdigit():
+            duration = max(10, min(int(tokens[0]), 600))
+            question_part = tokens[1]
+        elif len(tokens) == 1 and tokens[0].isdigit():
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error': 'Usage: /poll [seconds] Question | Option1 | Option2 [| ...]'
+            }))
+            return
+
+        question = question_part.strip()
         options = parts[1:]
+
+        if not question:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error': 'Poll question cannot be empty'
+            }))
+            return
 
         if len(options) > 10:
             await self.send(text_data=json.dumps({
@@ -455,45 +475,56 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
             return
 
-        # End any existing active poll in this stream
-        await self._deactivate_polls()
+        try:
+            await self._deactivate_polls()
+            poll_data = await self._create_poll(question, options, user, duration)
 
-        # Create the poll (default 5 minute duration)
-        poll_data = await self._create_poll(question, options, user)
-
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'poll_start',
-                'poll_id': poll_data['poll_id'],
-                'question': poll_data['question'],
-                'options': poll_data['options'],
-                'expires_at': poll_data['expires_at'],
-                'stream_id': self.stream_id,
-            }
-        )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'poll_start',
+                    'poll_id': poll_data['poll_id'],
+                    'question': poll_data['question'],
+                    'options': poll_data['options'],
+                    'expires_at': poll_data['expires_at'],
+                    'stream_id': self.stream_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Poll creation failed: {e}")
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error': f'Failed to create poll: {e}'
+            }))
 
     async def _handle_endpoll_command(self, user):
         """Handle /endpoll"""
-        poll_data = await self._end_active_poll()
+        try:
+            poll_data = await self._end_active_poll()
 
-        if not poll_data:
+            if not poll_data:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'error': 'No active poll in this stream'
+                }))
+                return
+
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'poll_end',
+                    'poll_id': poll_data['poll_id'],
+                    'question': poll_data['question'],
+                    'results': poll_data['results'],
+                    'stream_id': self.stream_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"End poll failed: {e}")
             await self.send(text_data=json.dumps({
                 'type': 'error',
-                'error': 'No active poll in this stream'
+                'error': f'Failed to end poll: {e}'
             }))
-            return
-
-        await self.channel_layer.group_send(
-            self.room_group_name,
-            {
-                'type': 'poll_end',
-                'poll_id': poll_data['poll_id'],
-                'question': poll_data['question'],
-                'results': poll_data['results'],
-                'stream_id': self.stream_id,
-            }
-        )
 
     async def handle_vote(self, poll_id, option_id):
         """Handle a vote on a poll"""
@@ -599,13 +630,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 return None
 
     @database_sync_to_async
-    def _create_poll(self, question, option_texts, user):
+    def _create_poll(self, question, option_texts, user, duration=60):
         """Create a new poll and return its serialized data."""
         poll = Poll.objects.create(
             stream_id=self.stream_id,
             question=question,
             created_by=user,
-            expires_at=timezone.now() + timedelta(minutes=5),
+            expires_at=timezone.now() + timedelta(seconds=duration),
             is_active=True,
         )
         options = []
