@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.db.models import Count
 from .models import (
     CustomUser, StreamSettings, ChatMessage, Emote, Invitation,
     PasswordResetToken, UserTimeout, UserBan, Poll, PollOption, PollVote,
@@ -119,17 +120,36 @@ class UserBanAdmin(admin.ModelAdmin):
 class PollOptionInline(admin.TabularInline):
     model = PollOption
     extra = 0
-    readonly_fields = ('text', 'order')
+    readonly_fields = ('text', 'order', 'vote_count')
+
+    def vote_count(self, obj):
+        return obj.votes.count()
+    vote_count.short_description = 'Votes'
 
 
 @admin.register(Poll)
 class PollAdmin(admin.ModelAdmin):
-    list_display = ('question', 'stream_id', 'created_by', 'is_active', 'created_at', 'expires_at')
+    list_display = ('question', 'stream_id', 'created_by', 'is_active', 'total_votes', 'leading_option', 'created_at', 'expires_at')
     list_filter = ('is_active', 'stream_id')
     search_fields = ('question', 'created_by__username')
-    readonly_fields = ('stream_id', 'question', 'created_by', 'created_at', 'expires_at')
+    readonly_fields = ('stream_id', 'question', 'created_by', 'created_at', 'expires_at', 'total_votes', 'leading_option')
     ordering = ('-created_at',)
     inlines = [PollOptionInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_total_votes=Count('votes'))
+
+    def total_votes(self, obj):
+        return obj._total_votes
+    total_votes.short_description = 'Total Votes'
+    total_votes.admin_order_field = '_total_votes'
+
+    def leading_option(self, obj):
+        top = obj.options.annotate(vc=Count('votes')).order_by('-vc').first()
+        if top and top.vc > 0:
+            return f'{top.text} ({top.vc})'
+        return '—'
+    leading_option.short_description = 'Leading Option'
 
 
 # Customize admin site branding

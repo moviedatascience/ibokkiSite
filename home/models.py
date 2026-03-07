@@ -404,10 +404,11 @@ class Poll(models.Model):
 
     @classmethod
     def get_active_poll(cls, stream_id):
-        """Get the currently active poll for a stream, if any."""
+        """Get the currently active, non-expired poll for a stream, if any."""
         return cls.objects.filter(
             stream_id=stream_id,
             is_active=True,
+            expires_at__gt=timezone.now(),
         ).first()
 
 

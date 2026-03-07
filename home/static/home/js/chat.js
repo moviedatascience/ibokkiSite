@@ -317,8 +317,9 @@ class ChatUI {
         this.pollContainer = null;
 
         this.activePollId = null;
-        this.hasVoted = false;
+        this.votedOptionId = null;
         this.pollTimer = null;
+        this.currentPollResults = null; // { question, results: [{id, text, votes}] }
 
         this.setupEventHandlers();
     }
@@ -502,7 +503,11 @@ class ChatUI {
         if (!this.pollContainer) return;
 
         this.activePollId = data.poll_id;
-        this.hasVoted = false;
+        this.votedOptionId = data.voted_option_id || null;
+        this.currentPollResults = {
+            question: data.question,
+            results: data.options.map(o => ({ id: o.id, text: o.text, votes: o.votes || 0 })),
+        };
 
         const expiresAt = data.expires_at * 1000;
         const createdBy = data.created_by || 'Unknown';
@@ -543,33 +548,54 @@ class ChatUI {
             </div>
         `;
 
+        // Highlight the option the user already voted for (e.g. on reconnect)
+        if (this.votedOptionId) {
+            this._updateVoteHighlight(this.votedOptionId);
+        }
+
         this.pollContainer.querySelector('.poll-dismiss').addEventListener('click', () => {
             this.pollContainer.innerHTML = '';
+            this.activePollId = null;
+            this.votedOptionId = null;
             if (this.pollTimer) { clearInterval(this.pollTimer); this.pollTimer = null; }
         });
 
         this.pollContainer.querySelectorAll('.poll-option').forEach(el => {
             el.addEventListener('click', () => {
-                if (this.hasVoted) return;
+                if (!this.activePollId) return; // Poll has ended, locked
                 const optionId = parseInt(el.dataset.optionId);
                 const pollId = parseInt(el.dataset.pollId);
                 this.chatClient.sendVote(pollId, optionId);
-                this.hasVoted = true;
-                this.pollContainer.querySelectorAll('.poll-option').forEach(o => {
-                    o.classList.remove('hover:brightness-125');
-                    o.style.cursor = 'default';
-                });
-                el.style.outline = '2px solid white';
-                el.style.outlineOffset = '-2px';
-                el.style.borderRadius = '2px';
+                this._updateVoteHighlight(optionId);
             });
         });
 
         this._startPollTimer(expiresAt);
     }
 
+    _updateVoteHighlight(optionId) {
+        this.votedOptionId = optionId;
+        if (!this.pollContainer) return;
+        this.pollContainer.querySelectorAll('.poll-option').forEach(o => {
+            o.style.outline = '';
+            o.style.outlineOffset = '';
+            o.style.borderRadius = '';
+        });
+        const selected = this.pollContainer.querySelector(`[data-option-id="${optionId}"]`);
+        if (selected) {
+            selected.style.outline = '2px solid white';
+            selected.style.outlineOffset = '-2px';
+            selected.style.borderRadius = '2px';
+        }
+    }
+
     updatePollResults(data) {
         if (!this.pollContainer || data.poll_id !== this.activePollId) return;
+
+        // Keep currentPollResults in sync so timer-expiry has fresh data
+        if (this.currentPollResults) {
+            this.currentPollResults.results = data.results.map(r => ({ id: r.id, text: r.text, votes: r.votes }));
+        }
 
         const totalVotes = data.total_votes || 0;
         const totalEl = this.pollContainer.querySelector('.poll-total-votes');
@@ -594,36 +620,25 @@ class ChatUI {
             this.pollTimer = null;
         }
 
+        // Only post to chat if the client-side timer hasn't already done so
+        // (activePollId is null when the timer already handled cleanup)
+        const shouldPostResults = this.activePollId !== null;
+
         this.activePollId = null;
+        this.votedOptionId = null;
+        this.currentPollResults = null;
 
+        if (shouldPostResults) {
+            this._showPollResultsInChat(data.question, data.results);
+        }
+
+        // Collapse the poll widget to a simple "Poll ended" notice
         const totalVotes = data.results.reduce((sum, o) => sum + o.votes, 0);
-
-        let resultsHtml = '';
-        data.results.forEach((opt, i) => {
-            const color = this._pollBarColors[i % this._pollBarColors.length];
-            const pct = totalVotes > 0 ? Math.round(opt.votes / totalVotes * 100) : 0;
-            resultsHtml += `
-                <div>
-                    <div class="flex justify-between text-xs text-gray-300 mb-0.5 px-1">
-                        <span><span class="font-bold text-white">${i + 1}</span> ${this._escapeHtml(opt.text)}</span>
-                        <span>${pct}% (${opt.votes} vote${opt.votes !== 1 ? 's' : ''})</span>
-                    </div>
-                    <div class="w-full bg-gray-700 rounded-sm h-5 overflow-hidden">
-                        <div class="h-full rounded-sm" style="width: ${pct}%; background-color: ${color};"></div>
-                    </div>
-                </div>
-            `;
-        });
-
         this.pollContainer.innerHTML = `
             <div class="poll-widget bg-[#1a1a2e] border border-gray-700 rounded p-3 mb-1">
-                <div class="flex justify-between items-start mb-1">
-                    <p class="text-white text-sm font-bold leading-tight">${this._escapeHtml(data.question)}</p>
+                <div class="flex justify-between items-start">
+                    <p class="text-gray-400 text-xs">Poll ended — ${totalVotes} vote${totalVotes !== 1 ? 's' : ''} cast. See results in chat.</p>
                     <button class="poll-dismiss text-gray-500 hover:text-white ml-2 text-lg leading-none flex-shrink-0" title="Dismiss">&times;</button>
-                </div>
-                <p class="text-gray-400 text-xs mb-2">Poll ended. ${totalVotes} vote${totalVotes !== 1 ? 's' : ''}</p>
-                <div class="space-y-1.5">
-                    ${resultsHtml}
                 </div>
             </div>
         `;
@@ -633,10 +648,39 @@ class ChatUI {
         });
 
         setTimeout(() => {
-            if (this.pollContainer && !this.activePollId) {
+            if (this.pollContainer) {
                 this.pollContainer.innerHTML = '';
             }
         }, 30000);
+    }
+
+    _showPollResultsInChat(question, results) {
+        if (!this.messageContainer) return;
+
+        const totalVotes = results.reduce((sum, o) => sum + o.votes, 0);
+        const sorted = [...results].sort((a, b) => b.votes - a.votes);
+        const winner = sorted[0];
+
+        const winnerLine = winner && winner.votes > 0
+            ? `<div class="font-bold text-white mb-1">Winner: ${this._escapeHtml(winner.text)} (${winner.votes} vote${winner.votes !== 1 ? 's' : ''})</div>`
+            : `<div class="text-gray-400 mb-1">No votes were cast.</div>`;
+
+        let breakdownHtml = results.map((opt, i) => {
+            const pct = totalVotes > 0 ? Math.round(opt.votes / totalVotes * 100) : 0;
+            const isWinner = opt.id === winner?.id && winner.votes > 0;
+            return `<div class="${isWinner ? 'text-white font-semibold' : 'text-gray-300'} text-xs">${i + 1}. ${this._escapeHtml(opt.text)} — ${opt.votes} vote${opt.votes !== 1 ? 's' : ''} (${pct}%)</div>`;
+        }).join('');
+
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'chat-info text-blue-400 py-1';
+        resultDiv.innerHTML = `
+            <div class="text-xs text-gray-400 mb-0.5">Poll ended: "${this._escapeHtml(question)}"</div>
+            ${winnerLine}
+            ${breakdownHtml}
+        `;
+
+        this.messageContainer.appendChild(resultDiv);
+        this.scrollToBottom();
     }
 
     _startPollTimer(expiresAt) {
@@ -656,7 +700,31 @@ class ChatUI {
             if (remaining <= 0) {
                 clearInterval(this.pollTimer);
                 this.pollTimer = null;
-                timerEl.textContent = 'Ended';
+                timerEl.textContent = 'Poll ended';
+
+                // If the server sends poll_end shortly after, showPollEnd will handle cleanup.
+                // If /endpoll was never issued, handle it client-side here.
+                const savedResults = this.currentPollResults;
+                this.activePollId = null;
+                this.votedOptionId = null;
+                this.currentPollResults = null;
+
+                if (savedResults) {
+                    this._showPollResultsInChat(savedResults.question, savedResults.results);
+                }
+
+                if (this.pollContainer) {
+                    this.pollContainer.querySelectorAll('.poll-option').forEach(o => {
+                        o.style.cursor = 'default';
+                        o.classList.remove('hover:brightness-125');
+                        o.style.pointerEvents = 'none';
+                    });
+                    setTimeout(() => {
+                        if (this.pollContainer) {
+                            this.pollContainer.innerHTML = '';
+                        }
+                    }, 30000);
+                }
             }
         };
 

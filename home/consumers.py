@@ -10,7 +10,6 @@ from .models import ChatMessage, Emote, UserTimeout, UserBan, Poll, PollOption, 
 from django.utils.html import escape
 from django.utils import timezone
 from datetime import timedelta
-from django.db import IntegrityError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -699,7 +698,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def _record_vote(self, user, poll_id, option_id):
         """Record a user's vote on a poll."""
         try:
-            poll = Poll.objects.get(id=poll_id, is_active=True)
+            poll = Poll.objects.get(id=poll_id, is_active=True, expires_at__gt=timezone.now())
         except Poll.DoesNotExist:
             return {'error': 'This poll is no longer active'}
 
@@ -708,10 +707,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except PollOption.DoesNotExist:
             return {'error': 'Invalid poll option'}
 
-        try:
-            PollVote.objects.create(poll=poll, option=option, user=user)
-        except IntegrityError:
-            return {'error': 'You have already voted on this poll'}
+        PollVote.objects.update_or_create(
+            poll=poll,
+            user=user,
+            defaults={'option': option},
+        )
 
         # Build updated results
         results = []
@@ -754,7 +754,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def send_active_poll(self):
         """Send the active poll to the connecting client, if one exists."""
-        poll_data = await self._get_active_poll_data()
+        user = self.scope["user"]
+        poll_data = await self._get_active_poll_data(user)
         if poll_data:
             await self.send(text_data=json.dumps({
                 'type': 'poll_start',
@@ -764,15 +765,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'expires_at': poll_data['expires_at'],
                 'created_by': poll_data.get('created_by', ''),
                 'duration': poll_data.get('duration', 60),
+                'voted_option_id': poll_data.get('voted_option_id'),
                 'stream_id': self.stream_id,
             }))
 
     @database_sync_to_async
-    def _get_active_poll_data(self):
-        """Get the active poll for this stream, if any."""
+    def _get_active_poll_data(self, user=None):
+        """Get the active, non-expired poll for this stream, if any."""
         poll = Poll.get_active_poll(self.stream_id)
         if not poll:
             return None
+
+        voted_option_id = None
+        if user and user.is_authenticated:
+            try:
+                existing_vote = PollVote.objects.get(poll=poll, user=user)
+                voted_option_id = existing_vote.option_id
+            except PollVote.DoesNotExist:
+                pass
 
         options = []
         total_votes = 0
@@ -792,6 +802,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'expires_at': poll.expires_at.timestamp(),
             'created_by': created_by,
             'duration': duration,
+            'voted_option_id': voted_option_id,
         }
 
     async def parse_emotes(self, message):
