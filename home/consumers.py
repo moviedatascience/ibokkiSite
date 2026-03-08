@@ -9,6 +9,7 @@ from django.conf import settings
 from .models import ChatMessage, Emote, UserTimeout, UserBan, Poll, PollOption, PollVote
 from django.utils.html import escape
 from django.utils import timezone
+from django.db import transaction
 from datetime import timedelta
 import logging
 
@@ -708,13 +709,12 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return {'error': 'Invalid poll option'}
 
         try:
-            PollVote.objects.update_or_create(
-                poll=poll,
-                user=user,
-                defaults={'option': option},
-            )
+            with transaction.atomic():
+                updated = PollVote.objects.filter(poll=poll, user=user).update(option=option)
+                if not updated:
+                    PollVote.objects.create(poll=poll, user=user, option=option)
         except Exception as e:
-            logger.error(f"Vote update failed: {e}", exc_info=True)
+            logger.error(f"Vote recording failed: {e}", exc_info=True)
             return {'error': 'Failed to record vote, please try again'}
 
         # Build updated results

@@ -504,6 +504,7 @@ class ChatUI {
 
         this.activePollId = data.poll_id;
         this.votedOptionId = data.voted_option_id || null;
+        this.pollResultsPosted = false;
         this.currentPollResults = {
             question: data.question,
             results: data.options.map(o => ({ id: o.id, text: o.text, votes: o.votes || 0 })),
@@ -620,13 +621,13 @@ class ChatUI {
             this.pollTimer = null;
         }
 
-        // Only post to chat if the client-side timer hasn't already done so
-        // (activePollId is null when the timer already handled cleanup)
-        const shouldPostResults = this.activePollId !== null;
+        // Only post to chat if the client-side timer hasn't already done so.
+        const shouldPostResults = !this.pollResultsPosted;
 
         this.activePollId = null;
         this.votedOptionId = null;
         this.currentPollResults = null;
+        this.pollResultsPosted = true;
 
         if (shouldPostResults) {
             this._showPollResultsInChat(data.question, data.results);
@@ -702,26 +703,26 @@ class ChatUI {
                 this.pollTimer = null;
                 timerEl.textContent = 'Poll ended';
 
-                // If the server sends poll_end shortly after, showPollEnd will handle cleanup.
-                // If /endpoll was never issued, handle it client-side here.
+                // Show results in chat (if server poll_end hasn't already done so).
+                // Do NOT lock activePollId here — let the server be the authority.
+                // Votes submitted after the client timer fires will be rejected by the server
+                // if the poll has truly expired.
                 const savedResults = this.currentPollResults;
-                this.activePollId = null;
-                this.votedOptionId = null;
                 this.currentPollResults = null;
 
-                if (savedResults) {
+                if (savedResults && !this.pollResultsPosted) {
                     this._showPollResultsInChat(savedResults.question, savedResults.results);
+                    this.pollResultsPosted = true;
                 }
 
+                // Auto-dismiss the widget after 30 s; lock activePollId only then
+                // (the widget is gone so there's nothing left to click).
                 if (this.pollContainer) {
-                    this.pollContainer.querySelectorAll('.poll-option').forEach(o => {
-                        o.style.cursor = 'default';
-                        o.classList.remove('hover:brightness-125');
-                        o.style.pointerEvents = 'none';
-                    });
                     setTimeout(() => {
                         if (this.pollContainer) {
                             this.pollContainer.innerHTML = '';
+                            this.activePollId = null;
+                            this.votedOptionId = null;
                         }
                     }, 30000);
                 }
