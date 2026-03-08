@@ -707,11 +707,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
         except PollOption.DoesNotExist:
             return {'error': 'Invalid poll option'}
 
-        PollVote.objects.update_or_create(
-            poll=poll,
-            user=user,
-            defaults={'option': option},
-        )
+        try:
+            PollVote.objects.update_or_create(
+                poll=poll,
+                user=user,
+                defaults={'option': option},
+            )
+        except Exception as e:
+            logger.error(f"Vote update failed: {e}", exc_info=True)
+            return {'error': 'Failed to record vote, please try again'}
 
         # Build updated results
         results = []

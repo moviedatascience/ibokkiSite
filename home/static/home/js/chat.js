@@ -680,7 +680,7 @@ class ChatUI {
         `;
 
         this.messageContainer.appendChild(resultDiv);
-        this.scrollToBottom();
+        this.messageContainer.scrollTop = this.messageContainer.scrollHeight;
     }
 
     _startPollTimer(expiresAt) {

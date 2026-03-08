@@ -28,9 +28,6 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'fallback_key')
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-KICK_CLIENT_ID = os.getenv("KICK_CLIENT_ID")
-
-KICK_CLIENT_SECRET = os.getenv("KICK_CLIENT_SECRET")
 
 ALLOWED_HOSTS = ["ibokki.com", "www.ibokki.com", "localhost", "127.0.0.1", ".ngrok-free.app"]
 
