@@ -1,5 +1,5 @@
 <!-- Dropdown -->
-<div class="p-4 border-b border-youtube-primary bg-youtube-secondary">
+<div class="p-4 border-b border-youtube-primary bg-youtube-nav">
     <select id="stream-select" class="w-full bg-youtube-primary text-youtube-secondary px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
         {% for stream in active_streams %}
             <option value="{{ stream.platform }}/{{ stream.channel_slug }}" {% if stream == current_stream %}selected{% endif %}>
@@ -42,7 +42,7 @@
     </div>
     <form id="chat-form" class="flex gap-2">
         <input type="text" id="chat-input" autocomplete="off" class="flex-1 bg-youtube-primary text-white placeholder:text-gray-500 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Type a message..." maxlength="{{ CHAT_MESSAGE_MAX_LENGTH }}">
-        <button type="button" id="eye-toggle-btn" class="p-2 text-gray-500 hover:text-white rounded-lg transition-colors" title="Toggle stream viewer filter">
+        <button type="button" id="eye-toggle-btn" class="p-2 text-gray-500 hover:opacity-80 rounded-lg transition-colors" title="Toggle stream viewer filter">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
         </button>
         <button type="submit" class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">Send</button>

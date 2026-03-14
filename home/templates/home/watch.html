@@ -6,7 +6,7 @@
 {% block content %}
 <div id="watch-flex-wrapper" class="flex flex-col md:flex-row h-full w-full min-h-0 pt-[3.5rem]">
     <!-- Left Chat Panel (empty container; chat panel is moved here via JS when toggled) -->
-    <div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-secondary border-r border-youtube-primary z-30 min-h-0">
+    <div id="chat-left" class="hidden w-[24rem] h-full flex flex-col bg-youtube-nav border-r border-youtube-primary z-30 min-h-0">
     </div>
 
     <!-- Main Column (Stream) -->
@@ -40,7 +40,7 @@
     </button>
 
     <!-- Right Chat Panel -->
-    <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-secondary border-l border-youtube-primary z-30 min-h-0">
+    <div id="chat-right" class="w-[24rem] h-full flex flex-col bg-youtube-nav border-l border-youtube-primary z-30 min-h-0">
         {% include "home/chat_panel.html" %}
     </div>
 </div>
