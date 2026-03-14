@@ -147,6 +147,7 @@
     const selectEls = document.querySelectorAll('#stream-select');
     const iframe = document.querySelector('iframe');
     let currentStreamKey = {% if current_stream %}'{{ current_stream.platform }}/{{ current_stream.channel_slug }}'{% else %}''{% endif %};
+    const userIsMod = {{ user.is_moderator_or_above|yesno:"true,false" }};
 
     selectEls.forEach(select => {
         select.addEventListener('change', function() {
@@ -160,6 +161,7 @@
                 const streamId = streamKey.replace('/', '_');
                 if (window.chatUI && window.chatUI.chatClient) {
                     window.chatUI.chatClient.switchStream(streamId);
+                    window.chatUI._applyEyeFilter();
                 }
             }
         });
@@ -182,7 +184,8 @@
         });
 
         chatUI = new ChatUI(chatClient, {
-            maxMessages: 100
+            maxMessages: 100,
+            isMod: userIsMod
         });
 
         if (chatUI.init('#chat-messages', '#chat-form', '#chat-input')) {

@@ -49,17 +49,12 @@ class ChatClient {
         this.onInfo = null;
     }
 
-    connect(streamId = 'general') {
-        this.currentStreamId = streamId;
+    connect(viewingStreamId = 'general') {
+        this.currentStreamId = viewingStreamId;
+        this.viewingStream = viewingStreamId;
 
         const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        let wsPath;
-
-        if (streamId && streamId !== 'general') {
-            wsPath = `${wsScheme}://${window.location.host}/ws/chat/${streamId}/`;
-        } else {
-            wsPath = `${wsScheme}://${window.location.host}/ws/chat/?stream=${streamId}`;
-        }
+        const wsPath = `${wsScheme}://${window.location.host}/ws/chat/?stream=${viewingStreamId}`;
 
         console.log('Connecting to WebSocket:', wsPath);
 
@@ -259,6 +254,7 @@ class ChatClient {
 
     switchStream(streamId) {
         this.currentStreamId = streamId;
+        this.viewingStream = streamId;
         return this.send({
             type: 'join_stream',
             stream_id: streamId
@@ -310,10 +306,21 @@ class ChatClient {
 
 // Chat UI Manager
 class ChatUI {
+    static MOD_COMMANDS = [
+        { command: '/clear', usage: '/clear', description: 'Clear all chat messages' },
+        { command: '/timeout', usage: '/timeout <user> [seconds]', description: 'Timeout a user (default 300s)' },
+        { command: '/untimeout', usage: '/untimeout <user>', description: 'Remove a user\'s timeout' },
+        { command: '/ban', usage: '/ban <user> [hours]', description: 'Ban a user (permanent if no duration)' },
+        { command: '/unban', usage: '/unban <user>', description: 'Unban a user' },
+        { command: '/poll', usage: '/poll [sec] Question | Opt1 | Opt2', description: 'Create a poll (default 60s)' },
+        { command: '/endpoll', usage: '/endpoll', description: 'End the current poll early' },
+    ];
+
     constructor(chatClient, options = {}) {
         this.chatClient = chatClient;
         this.options = {
             maxMessages: 100,
+            isMod: false,
             ...options
         };
 
@@ -328,6 +335,9 @@ class ChatUI {
         this.pollTimer = null;
         this.pollExpired = false;
         this.currentPollResults = null;
+
+        this.eyeFilterActive = false;
+        this.slashHighlightIndex = -1;
 
         this.setupEventHandlers();
     }
@@ -345,11 +355,15 @@ class ChatUI {
         }
 
         this.setupFormHandler();
+        this._setupEyeToggle();
+        if (this.options.isMod) {
+            this._setupSlashCommands();
+        }
         return true;
     }
 
     setupEventHandlers() {
-        this.chatClient.onHistory = (history, streamId) => {
+        this.chatClient.onHistory = (history) => {
             this.clearMessages();
             history.forEach(msg => this.appendMessage(msg));
         };
@@ -416,6 +430,7 @@ class ChatUI {
                         this.chatClient.sendMessage(message);
                     }
                     this.inputField.value = '';
+                    this._hideSlashPopup();
                 }
             });
         }
@@ -431,6 +446,14 @@ class ChatUI {
 
         const messageDiv = document.createElement('div');
         messageDiv.className = 'chat-message text-youtube-primary py-1 break-words';
+
+        if (data.viewing_stream) {
+            messageDiv.dataset.viewingStream = data.viewing_stream;
+        }
+
+        if (this.eyeFilterActive && data.viewing_stream && data.viewing_stream !== this.chatClient.viewingStream) {
+            messageDiv.classList.add('chat-message-dimmed');
+        }
 
         const timestamp = data.timestamp ? new Date(data.timestamp * 1000) : new Date();
         const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -731,6 +754,135 @@ class ChatUI {
     }
 
     // --- End Poll UI ---
+
+    // --- Eye Toggle (stream viewer filter) ---
+
+    _setupEyeToggle() {
+        const btn = document.getElementById('eye-toggle-btn');
+        if (!btn) return;
+        btn.addEventListener('click', () => this.toggleEyeFilter());
+    }
+
+    toggleEyeFilter() {
+        this.eyeFilterActive = !this.eyeFilterActive;
+        const btn = document.getElementById('eye-toggle-btn');
+        if (btn) {
+            btn.classList.toggle('active', this.eyeFilterActive);
+        }
+        this._applyEyeFilter();
+    }
+
+    _applyEyeFilter() {
+        if (!this.messageContainer) return;
+        const myStream = this.chatClient.viewingStream;
+        this.messageContainer.querySelectorAll('.chat-message').forEach(el => {
+            const vs = el.dataset.viewingStream;
+            if (this.eyeFilterActive && vs && vs !== myStream) {
+                el.classList.add('chat-message-dimmed');
+            } else {
+                el.classList.remove('chat-message-dimmed');
+            }
+        });
+    }
+
+    // --- Slash Command Popup ---
+
+    _setupSlashCommands() {
+        if (!this.inputField) return;
+        this.slashPopup = document.getElementById('slash-command-popup');
+        this.slashList = document.getElementById('slash-command-list');
+        if (!this.slashPopup || !this.slashList) return;
+
+        this.inputField.addEventListener('input', () => this._onSlashInput());
+        this.inputField.addEventListener('keydown', (e) => this._onSlashKeydown(e));
+        document.addEventListener('click', (e) => {
+            if (this.slashPopup && !this.slashPopup.contains(e.target) && e.target !== this.inputField) {
+                this._hideSlashPopup();
+            }
+        });
+    }
+
+    _onSlashInput() {
+        const val = this.inputField.value;
+        if (!val.startsWith('/')) {
+            this._hideSlashPopup();
+            return;
+        }
+        const typed = val.split(' ')[0].toLowerCase();
+        const matches = ChatUI.MOD_COMMANDS.filter(c => c.command.startsWith(typed));
+
+        if (matches.length === 0 || val.includes(' ')) {
+            this._hideSlashPopup();
+            return;
+        }
+
+        this.slashHighlightIndex = 0;
+        this._renderSlashPopup(matches);
+    }
+
+    _renderSlashPopup(matches) {
+        this.slashList.innerHTML = '';
+        matches.forEach((cmd, i) => {
+            const row = document.createElement('div');
+            row.className = 'slash-cmd-item' + (i === this.slashHighlightIndex ? ' highlighted' : '');
+            row.innerHTML = `
+                <span class="cmd-name">${cmd.command}</span><span class="cmd-usage">${this._escapeHtml(cmd.usage)}</span>
+                <span class="cmd-desc">${this._escapeHtml(cmd.description)}</span>
+            `;
+            row.addEventListener('click', () => {
+                this.inputField.value = cmd.command + ' ';
+                this._hideSlashPopup();
+                this.inputField.focus();
+            });
+            this.slashList.appendChild(row);
+        });
+        this.slashPopup.classList.remove('hidden');
+        this._currentSlashMatches = matches;
+    }
+
+    _onSlashKeydown(e) {
+        if (!this.slashPopup || this.slashPopup.classList.contains('hidden')) return;
+        const matches = this._currentSlashMatches || [];
+        if (matches.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.slashHighlightIndex = Math.min(this.slashHighlightIndex + 1, matches.length - 1);
+            this._updateSlashHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.slashHighlightIndex = Math.max(this.slashHighlightIndex - 1, 0);
+            this._updateSlashHighlight();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            if (this.slashHighlightIndex >= 0 && this.slashHighlightIndex < matches.length) {
+                const inputHasArgs = this.inputField.value.includes(' ');
+                if (!inputHasArgs) {
+                    e.preventDefault();
+                    this.inputField.value = matches[this.slashHighlightIndex].command + ' ';
+                    this._hideSlashPopup();
+                }
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            this._hideSlashPopup();
+        }
+    }
+
+    _updateSlashHighlight() {
+        if (!this.slashList) return;
+        const items = this.slashList.querySelectorAll('.slash-cmd-item');
+        items.forEach((el, i) => {
+            el.classList.toggle('highlighted', i === this.slashHighlightIndex);
+        });
+    }
+
+    _hideSlashPopup() {
+        if (this.slashPopup) {
+            this.slashPopup.classList.add('hidden');
+        }
+        this.slashHighlightIndex = -1;
+        this._currentSlashMatches = [];
+    }
 
     updateStatus(status) {
         if (this.statusIndicator) {

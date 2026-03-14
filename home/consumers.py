@@ -22,19 +22,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         logger.info(f"WebSocket connection attempt from {self.scope['user']}")
 
+        self.stream_id = 'global'
+        self.room_name = 'stream_global'
+        self.room_group_name = 'chat_stream_global'
+
         url_route = self.scope.get('url_route', {})
         kwargs = url_route.get('kwargs', {}) if url_route else {}
-        self.stream_id = kwargs.get('stream_id', 'general')
+        self.viewing_stream = kwargs.get('stream_id', 'general')
 
-        if self.stream_id == 'general':
+        if self.viewing_stream == 'general':
             query_string = self.scope.get('query_string', b'').decode()
             if 'stream=' in query_string:
                 params = urllib.parse.parse_qs(query_string)
                 if 'stream' in params:
-                    self.stream_id = params['stream'][0]
-
-        self.room_name = f"stream_{self.stream_id}"
-        self.room_group_name = f"chat_{self.room_name}"
+                    self.viewing_stream = params['stream'][0]
 
         await self.channel_layer.group_add(
             self.room_group_name,
@@ -43,12 +44,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
         logger.info(
-            f"WebSocket connection accepted for {self.scope['user']} in room {self.room_group_name}"
+            f"WebSocket connection accepted for {self.scope['user']} in room {self.room_group_name} (viewing: {self.viewing_stream})"
         )
 
         await self.send_chat_history()
 
-        # Send active poll if one exists
         await self.send_active_poll()
 
         self.last_ping = time.time()
@@ -112,27 +112,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 pass
 
     async def switch_stream(self, new_stream_id):
-        """Handle switching to a different stream chat"""
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-
-        self.stream_id = new_stream_id
-        self.room_name = f"stream_{self.stream_id}"
-        self.room_group_name = f"chat_{self.room_name}"
-
-        await self.channel_layer.group_add(
-            self.room_group_name,
-            self.channel_name
-        )
-
+        """Update the user's viewing stream (video selection only, chat stays global)."""
+        self.viewing_stream = new_stream_id
         logger.info(
-            f"User {self.scope['user']} switched to room {self.room_group_name}"
+            f"User {self.scope['user']} now viewing stream {self.viewing_stream}"
         )
-
-        await self.send_chat_history()
-        await self.send_active_poll()
 
     async def handle_ping(self):
         """Handle ping from client"""
@@ -238,6 +222,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'role': user.role,
                 'is_staff': user.is_staff,
                 'stream_id': self.stream_id,
+                'viewing_stream': self.viewing_stream,
             }
         )
 
@@ -636,6 +621,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'is_staff': event.get('is_staff', False),
             'timestamp': time.time(),
             'stream_id': event.get('stream_id', self.stream_id),
+            'viewing_stream': event.get('viewing_stream', ''),
         }))
 
     async def chat_clear(self, event):
