@@ -503,6 +503,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'stream_id': self.stream_id,
                 }
             )
+
+            asyncio.create_task(self._schedule_poll_expiry(poll_data['poll_id'], duration))
         except Exception as e:
             logger.error(f"Poll creation failed: {e}")
             await self.send(text_data=json.dumps({
@@ -532,6 +534,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'stream_id': self.stream_id,
                 }
             )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'poll_results_announcement',
+                    'question': poll_data['question'],
+                    'results': poll_data['results'],
+                    'stream_id': self.stream_id,
+                }
+            )
         except Exception as e:
             logger.error(f"End poll failed: {e}")
             await self.send(text_data=json.dumps({
@@ -539,12 +550,59 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'error': f'Failed to end poll: {e}'
             }))
 
+    async def _schedule_poll_expiry(self, poll_id, duration):
+        """Auto-end a poll after its duration elapses."""
+        await asyncio.sleep(duration)
+        try:
+            poll_data = await self._end_poll_by_id(poll_id)
+            if not poll_data:
+                return
+
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'poll_end',
+                    'poll_id': poll_data['poll_id'],
+                    'question': poll_data['question'],
+                    'results': poll_data['results'],
+                    'stream_id': self.stream_id,
+                }
+            )
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'poll_results_announcement',
+                    'question': poll_data['question'],
+                    'results': poll_data['results'],
+                    'stream_id': self.stream_id,
+                }
+            )
+        except Exception as e:
+            logger.error(f"Poll auto-expiry failed for poll {poll_id}: {e}", exc_info=True)
+
     async def handle_vote(self, poll_id, option_id):
         """Handle a vote on a poll"""
         if not self.scope["user"].is_authenticated:
             return
 
         user = self.scope["user"]
+
+        is_banned = await database_sync_to_async(UserBan.is_banned)(user)
+        if is_banned:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error': 'You are banned from chat'
+            }))
+            return
+
+        is_timed_out = await database_sync_to_async(UserTimeout.is_timed_out)(user, self.stream_id)
+        if is_timed_out:
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error': 'You are timed out'
+            }))
+            return
+
         result = await self._record_vote(user, poll_id, option_id)
 
         if result.get('error'):
@@ -631,6 +689,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'stream_id': event.get('stream_id', self.stream_id),
         }))
 
+    async def poll_results_announcement(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'poll_results_announcement',
+            'question': event['question'],
+            'results': event['results'],
+            'stream_id': event.get('stream_id', self.stream_id),
+        }))
+
     # --- Database helpers ---
 
     @database_sync_to_async
@@ -676,6 +742,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
         """End the active poll and return final results."""
         poll = Poll.objects.filter(stream_id=self.stream_id, is_active=True).first()
         if not poll:
+            return None
+
+        poll.is_active = False
+        poll.save()
+
+        results = []
+        for opt in poll.options.all().order_by('order'):
+            results.append({
+                'id': opt.id,
+                'text': opt.text,
+                'votes': opt.votes.count(),
+            })
+
+        return {
+            'poll_id': poll.id,
+            'question': poll.question,
+            'results': results,
+        }
+
+    @database_sync_to_async
+    def _end_poll_by_id(self, poll_id):
+        """End a specific poll by ID, only if still active. Returns None if already ended."""
+        try:
+            poll = Poll.objects.get(id=poll_id, is_active=True)
+        except Poll.DoesNotExist:
             return None
 
         poll.is_active = False

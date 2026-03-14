@@ -45,6 +45,7 @@ class ChatClient {
         this.onPollStart = null;
         this.onPollUpdate = null;
         this.onPollEnd = null;
+        this.onPollResultsAnnouncement = null;
         this.onInfo = null;
     }
 
@@ -137,6 +138,12 @@ class ChatClient {
                 case 'poll_end':
                     if (this.onPollEnd) {
                         this.onPollEnd(data);
+                    }
+                    break;
+
+                case 'poll_results_announcement':
+                    if (this.onPollResultsAnnouncement) {
+                        this.onPollResultsAnnouncement(data);
                     }
                     break;
 
@@ -319,7 +326,8 @@ class ChatUI {
         this.activePollId = null;
         this.votedOptionId = null;
         this.pollTimer = null;
-        this.currentPollResults = null; // { question, results: [{id, text, votes}] }
+        this.pollExpired = false;
+        this.currentPollResults = null;
 
         this.setupEventHandlers();
     }
@@ -388,6 +396,10 @@ class ChatUI {
 
         this.chatClient.onPollEnd = (data) => {
             this.showPollEnd(data);
+        };
+
+        this.chatClient.onPollResultsAnnouncement = (data) => {
+            this._showPollResultsInChat(data.question, data.results);
         };
     }
 
@@ -504,6 +516,7 @@ class ChatUI {
 
         this.activePollId = data.poll_id;
         this.votedOptionId = data.voted_option_id || null;
+        this.pollExpired = false;
         this.pollResultsPosted = false;
         this.currentPollResults = {
             question: data.question,
@@ -563,9 +576,10 @@ class ChatUI {
 
         this.pollContainer.querySelectorAll('.poll-option').forEach(el => {
             el.addEventListener('click', () => {
-                if (!this.activePollId) return; // Poll has ended, locked
+                if (!this.activePollId || this.pollExpired) return;
                 const optionId = parseInt(el.dataset.optionId);
                 const pollId = parseInt(el.dataset.pollId);
+                if (isNaN(optionId) || isNaN(pollId)) return;
                 this.chatClient.sendVote(pollId, optionId);
                 this._updateVoteHighlight(optionId);
             });
@@ -621,19 +635,11 @@ class ChatUI {
             this.pollTimer = null;
         }
 
-        // Only post to chat if the client-side timer hasn't already done so.
-        const shouldPostResults = !this.pollResultsPosted;
-
         this.activePollId = null;
         this.votedOptionId = null;
+        this.pollExpired = false;
         this.currentPollResults = null;
-        this.pollResultsPosted = true;
 
-        if (shouldPostResults) {
-            this._showPollResultsInChat(data.question, data.results);
-        }
-
-        // Collapse the poll widget to a simple "Poll ended" notice
         const totalVotes = data.results.reduce((sum, o) => sum + o.votes, 0);
         this.pollContainer.innerHTML = `
             <div class="poll-widget bg-[#1a1a2e] border border-gray-700 rounded p-3 mb-1">
@@ -652,7 +658,7 @@ class ChatUI {
             if (this.pollContainer) {
                 this.pollContainer.innerHTML = '';
             }
-        }, 30000);
+        }, 5000);
     }
 
     _showPollResultsInChat(question, results) {
@@ -701,30 +707,15 @@ class ChatUI {
             if (remaining <= 0) {
                 clearInterval(this.pollTimer);
                 this.pollTimer = null;
-                timerEl.textContent = 'Poll ended';
+                this.pollExpired = true;
+                timerEl.textContent = 'Waiting for results...';
 
-                // Show results in chat (if server poll_end hasn't already done so).
-                // Do NOT lock activePollId here — let the server be the authority.
-                // Votes submitted after the client timer fires will be rejected by the server
-                // if the poll has truly expired.
-                const savedResults = this.currentPollResults;
-                this.currentPollResults = null;
-
-                if (savedResults && !this.pollResultsPosted) {
-                    this._showPollResultsInChat(savedResults.question, savedResults.results);
-                    this.pollResultsPosted = true;
-                }
-
-                // Auto-dismiss the widget after 30 s; lock activePollId only then
-                // (the widget is gone so there's nothing left to click).
                 if (this.pollContainer) {
-                    setTimeout(() => {
-                        if (this.pollContainer) {
-                            this.pollContainer.innerHTML = '';
-                            this.activePollId = null;
-                            this.votedOptionId = null;
-                        }
-                    }, 30000);
+                    this.pollContainer.querySelectorAll('.poll-option').forEach(o => {
+                        o.style.opacity = '0.6';
+                        o.style.pointerEvents = 'none';
+                        o.classList.remove('cursor-pointer', 'hover:brightness-125');
+                    });
                 }
             }
         };
