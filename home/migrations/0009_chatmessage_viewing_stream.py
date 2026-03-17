@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("home", "0007_set_admin_role_for_staff"),
+        ("home", "0008_rename_home_invita_token_h_idx_home_invita_token_h_d2de43_idx_and_more"),
     ]
 
     operations = [
