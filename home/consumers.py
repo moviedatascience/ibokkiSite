@@ -207,7 +207,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
         await database_sync_to_async(ChatMessage.objects.create)(
             user=user,
             message=message,
-            stream_id=self.stream_id
+            stream_id=self.stream_id,
+            viewing_stream=self.viewing_stream,
         )
 
         parsed_message = await self.parse_emotes(message)
@@ -830,6 +831,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'is_staff': msg.user.is_staff,
                 'timestamp': msg.timestamp.timestamp(),
                 'stream_id': msg.stream_id,
+                'viewing_stream': msg.viewing_stream or '',
             })
         return history
 

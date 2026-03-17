@@ -453,6 +453,7 @@ class ChatUI {
 
         if (this.eyeFilterActive && data.viewing_stream && data.viewing_stream !== this.chatClient.viewingStream) {
             messageDiv.classList.add('chat-message-dimmed');
+            console.log('[EyeFilter] dimmed msg from', data.user, '(viewing:', data.viewing_stream, ', mine:', this.chatClient.viewingStream, ')');
         }
 
         const timestamp = data.timestamp ? new Date(data.timestamp * 1000) : new Date();
@@ -769,20 +770,25 @@ class ChatUI {
         if (btn) {
             btn.classList.toggle('active', this.eyeFilterActive);
         }
+        console.log('[EyeToggle] active:', this.eyeFilterActive, '| myStream:', this.chatClient.viewingStream);
         this._applyEyeFilter();
     }
 
     _applyEyeFilter() {
         if (!this.messageContainer) return;
         const myStream = this.chatClient.viewingStream;
+        let total = 0, dimmed = 0;
         this.messageContainer.querySelectorAll('.chat-message').forEach(el => {
+            total++;
             const vs = el.dataset.viewingStream;
             if (this.eyeFilterActive && vs && vs !== myStream) {
                 el.classList.add('chat-message-dimmed');
+                dimmed++;
             } else {
                 el.classList.remove('chat-message-dimmed');
             }
         });
+        console.log('[EyeFilter] applied:', this.eyeFilterActive, '| myStream:', myStream, '| dimmed:', dimmed, '/', total);
     }
 
     // --- Slash Command Popup ---

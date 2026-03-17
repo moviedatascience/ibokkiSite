@@ -283,6 +283,7 @@ class ChatMessage(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     message = models.TextField()
     stream_id = models.CharField(max_length=100, default='general', help_text="Stream identifier for chat grouping")
+    viewing_stream = models.CharField(max_length=100, default='', blank=True, help_text="Stream the user was viewing when they sent this message")
     timestamp = models.DateTimeField(default=timezone.now)
 
     class Meta:
