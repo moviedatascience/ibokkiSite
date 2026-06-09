@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.db.models import Q
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 from django.core.exceptions import ValidationError
 from django.conf import settings
 import requests
@@ -296,12 +298,50 @@ class ChatMessage(models.Model):
         return f"{self.user.display_name or self.user.username}: {self.message[:30]} [{self.stream_id}]"
 
 class Emote(models.Model):
-    code = models.CharField(max_length=32, unique=True, help_text="Emote code, e.g. :OMEGALUL:")
+    code = models.CharField(
+        max_length=32,
+        unique=True,
+        help_text="Bare-word emote code, e.g. OMEGALUL (case-sensitive, no surrounding colons)",
+    )
     image = models.ImageField(upload_to="emotes/")
     is_animated = models.BooleanField(default=False)
 
+    CACHE_KEY = "emote_manifest_v1"
+    CACHE_TIMEOUT = 60  # seconds; short TTL lets stale per-process caches self-heal
+
     def __str__(self):
         return self.code
+
+    @classmethod
+    def get_manifest(cls):
+        """List of {code, url, animated} for every emote. Cached; used by the
+        client (autocomplete/picker) and to build the server-side parse map."""
+        from django.core.cache import cache
+
+        manifest = cache.get(cls.CACHE_KEY)
+        if manifest is None:
+            manifest = [
+                {"code": e.code, "url": e.image.url, "animated": e.is_animated}
+                for e in cls.objects.all()
+            ]
+            cache.set(cls.CACHE_KEY, manifest, cls.CACHE_TIMEOUT)
+        return manifest
+
+    @classmethod
+    def get_code_url_map(cls):
+        """{code: url} derived from the cached manifest, for message parsing."""
+        return {e["code"]: e["url"] for e in cls.get_manifest()}
+
+    @classmethod
+    def clear_manifest_cache(cls):
+        from django.core.cache import cache
+
+        cache.delete(cls.CACHE_KEY)
+
+
+@receiver([post_save, post_delete], sender=Emote)
+def _invalidate_emote_manifest(sender, **kwargs):
+    Emote.clear_manifest_cache()
 
 
 class UserTimeout(models.Model):

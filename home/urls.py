@@ -9,6 +9,7 @@ urlpatterns = [
     path('forgot-password/', views.forgot_password_view, name='forgot_password'),
     path('reset-password/<str:token>/', views.reset_password_view, name='reset_password'),
     path('watch/', views.watch, name='watch'),
+    path('emotes/manifest/', views.emote_manifest, name='emote_manifest'),
     path('switch-stream/', views.switch_stream, name='switch_stream'),
     path('profile/', views.profile_view, name='profile'),
 ]

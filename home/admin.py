@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.db.models import Count
+from django.utils.html import format_html
 from .models import (
     CustomUser, StreamSettings, ChatMessage, Emote, Invitation,
     PasswordResetToken, UserTimeout, UserBan, Poll, PollOption, PollVote,
@@ -95,8 +96,18 @@ class ChatMessageAdmin(admin.ModelAdmin):
 
 @admin.register(Emote)
 class EmoteAdmin(admin.ModelAdmin):
-    list_display = ('code', 'is_animated')
+    list_display = ('preview', 'code', 'is_animated')
     search_fields = ('code',)
+    readonly_fields = ('preview',)
+
+    @admin.display(description='Preview')
+    def preview(self, obj):
+        if obj.image:
+            return format_html(
+                '<img src="{}" alt="{}" style="height:28px;vertical-align:middle;" />',
+                obj.image.url, obj.code,
+            )
+        return '—'
 
 
 @admin.register(UserTimeout)

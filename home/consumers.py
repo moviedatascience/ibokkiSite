@@ -1,4 +1,5 @@
 import json
+import re
 import time
 import asyncio
 import urllib.parse
@@ -819,7 +820,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             stream_id=self.stream_id
         ).order_by('-timestamp')[:settings.CHAT_MESSAGE_HISTORY_LENGTH]
 
-        emotes = {e.code: e.image.url for e in Emote.objects.all()}
+        emotes = Emote.get_code_url_map()
         history = []
         for msg in reversed(messages):
             parsed_message = self._parse_emotes_sync(msg.message, emotes)
@@ -889,20 +890,37 @@ class ChatConsumer(AsyncWebsocketConsumer):
         }
 
     async def parse_emotes(self, message):
-        emotes = await database_sync_to_async(lambda: list(Emote.objects.all()))()
-        emote_map = {e.code: e.image.url for e in emotes}
+        emote_map = await database_sync_to_async(Emote.get_code_url_map)()
         return self._parse_emotes_sync(message, emote_map)
 
     def _parse_emotes_sync(self, message, emote_map):
         safe_message = escape(message)
-        sorted_codes = sorted(emote_map.keys(), key=len, reverse=True)
-        for code in sorted_codes:
+        if not emote_map:
+            return safe_message
+
+        # Map the escaped token back to its original emote code, so a regex
+        # match against the (already escaped) message can be resolved to a key.
+        escaped_to_code = {escape(c): c for c in emote_map}
+
+        # Match emote codes only as whole whitespace-delimited tokens (mirrors
+        # destiny.gg semantics), so codes never render inside other words, URLs,
+        # or the attributes of already-injected <img> tags. Longest-first so a
+        # code that is a prefix of another does not shadow it.
+        sorted_tokens = sorted(escaped_to_code.keys(), key=len, reverse=True)
+        pattern = re.compile(
+            r'(?<!\S)(' + '|'.join(re.escape(t) for t in sorted_tokens) + r')(?!\S)'
+        )
+
+        def _replace(match):
+            code = escaped_to_code[match.group(1)]
             url = emote_map[code]
-            safe_message = safe_message.replace(
-                escape(code),
-                f'<img src="{url}" alt="{code}" class="inline-emote" title="{code}">'
+            safe_code = escape(code)
+            return (
+                f'<img src="{url}" alt="{safe_code}" '
+                f'class="inline-emote" title="{safe_code}">'
             )
-        return safe_message
+
+        return pattern.sub(_replace, safe_message)
 
     async def send_chat_history(self):
         history = await self.get_chat_history()

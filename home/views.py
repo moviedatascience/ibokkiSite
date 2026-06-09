@@ -9,7 +9,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from .models import StreamSettings, Invitation, PasswordResetToken
+from .models import StreamSettings, Invitation, PasswordResetToken, Emote
 from django.contrib import messages
 from django.http import JsonResponse
 import logging
@@ -416,6 +416,14 @@ def watch(request):
         return render(request, 'home/chat_popout.html', context)
 
     return render(request, 'home/watch.html', context)
+
+
+# ---------------------------------------------------------------------------
+# Emote manifest (JSON) — consumed by the chat client for autocomplete + picker
+# ---------------------------------------------------------------------------
+@login_required
+def emote_manifest(request):
+    return JsonResponse({'emotes': Emote.get_manifest()})
 
 
 # ---------------------------------------------------------------------------

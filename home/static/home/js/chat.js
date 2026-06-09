@@ -339,6 +339,12 @@ class ChatUI {
         this.eyeFilterActive = false;
         this.slashHighlightIndex = -1;
 
+        // Emotes
+        this.emotes = [];
+        this.emoteMap = {};
+        this.emoteCodes = [];
+        this.emoteHighlightIndex = -1;
+
         this.setupEventHandlers();
     }
 
@@ -359,6 +365,9 @@ class ChatUI {
         if (this.options.isMod) {
             this._setupSlashCommands();
         }
+        this._loadEmotes();
+        this._setupEmoteAutocomplete();
+        this._setupEmotePicker();
         return true;
     }
 
@@ -888,6 +897,227 @@ class ChatUI {
         }
         this.slashHighlightIndex = -1;
         this._currentSlashMatches = [];
+    }
+
+    // --- Emotes ---
+
+    _loadEmotes() {
+        fetch('/emotes/manifest/', { credentials: 'same-origin' })
+            .then(r => (r.ok ? r.json() : { emotes: [] }))
+            .then(data => {
+                this.emotes = data.emotes || [];
+                this.emoteMap = {};
+                this.emoteCodes = [];
+                this.emotes.forEach(e => {
+                    this.emoteMap[e.code] = e;
+                    this.emoteCodes.push(e.code);
+                });
+                // Longest-first so prefix matches favour the more specific code.
+                this.emoteCodes.sort((a, b) => b.length - a.length);
+            })
+            .catch(() => { /* emotes are non-critical; chat still works */ });
+    }
+
+    _getWordAtCaret() {
+        const input = this.inputField;
+        const pos = input.selectionStart;
+        const val = input.value;
+        let start = pos;
+        while (start > 0 && !/\s/.test(val[start - 1])) start--;
+        let end = pos;
+        while (end < val.length && !/\s/.test(val[end])) end++;
+        return { word: val.slice(start, end), start, end };
+    }
+
+    _insertEmoteCode(code) {
+        const input = this.inputField;
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        const val = input.value;
+        const before = val.slice(0, start);
+        const after = val.slice(end);
+        const needLead = before.length > 0 && !/\s$/.test(before);
+        const insert = (needLead ? ' ' : '') + code + ' ';
+        input.value = before + insert + after;
+        const caret = (before + insert).length;
+        input.setSelectionRange(caret, caret);
+        input.focus();
+    }
+
+    // Emote autocomplete popup (reuses the slash-popup look)
+
+    _setupEmoteAutocomplete() {
+        if (!this.inputField) return;
+        this.emotePopup = document.getElementById('emote-autocomplete-popup');
+        this.emoteList = document.getElementById('emote-autocomplete-list');
+        if (!this.emotePopup || !this.emoteList) return;
+
+        this.inputField.addEventListener('input', () => this._onEmoteInput());
+        this.inputField.addEventListener('keydown', (e) => this._onEmoteKeydown(e));
+        document.addEventListener('click', (e) => {
+            if (this.emotePopup && !this.emotePopup.contains(e.target) && e.target !== this.inputField) {
+                this._hideEmoteAutocomplete();
+            }
+        });
+    }
+
+    _onEmoteInput() {
+        if (!this.emotePopup) return;
+        // Defer to the slash-command popup when it is open.
+        if (this.slashPopup && !this.slashPopup.classList.contains('hidden')) {
+            this._hideEmoteAutocomplete();
+            return;
+        }
+        const val = this.inputField.value;
+        if (val.startsWith('/') || this.emoteCodes.length === 0) {
+            this._hideEmoteAutocomplete();
+            return;
+        }
+        const { word } = this._getWordAtCaret();
+        if (word.length < 2) {
+            this._hideEmoteAutocomplete();
+            return;
+        }
+        const lower = word.toLowerCase();
+        const matches = this.emoteCodes
+            .filter(c => c.toLowerCase().startsWith(lower))
+            .slice(0, 12);
+        if (matches.length === 0) {
+            this._hideEmoteAutocomplete();
+            return;
+        }
+        this.emoteHighlightIndex = 0;
+        this._renderEmoteAutocomplete(matches);
+    }
+
+    _renderEmoteAutocomplete(matches) {
+        this.emoteList.innerHTML = '';
+        matches.forEach((code, i) => {
+            const row = document.createElement('div');
+            row.className = 'slash-cmd-item emote-suggestion' + (i === this.emoteHighlightIndex ? ' highlighted' : '');
+            const emote = this.emoteMap[code];
+            row.innerHTML = `
+                <img src="${emote.url}" alt="${this._escapeHtml(code)}" class="emote-suggestion-img">
+                <span class="cmd-name">${this._escapeHtml(code)}</span>
+            `;
+            row.addEventListener('click', () => this._completeEmote(code));
+            this.emoteList.appendChild(row);
+        });
+        this.emotePopup.classList.remove('hidden');
+        this._currentEmoteMatches = matches;
+    }
+
+    _completeEmote(code) {
+        const { start, end } = this._getWordAtCaret();
+        const val = this.inputField.value;
+        const insert = code + ' ';
+        this.inputField.value = val.slice(0, start) + insert + val.slice(end);
+        const caret = start + insert.length;
+        this.inputField.setSelectionRange(caret, caret);
+        this._hideEmoteAutocomplete();
+        this.inputField.focus();
+    }
+
+    _onEmoteKeydown(e) {
+        if (!this.emotePopup || this.emotePopup.classList.contains('hidden')) return;
+        const matches = this._currentEmoteMatches || [];
+        if (matches.length === 0) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.emoteHighlightIndex = Math.min(this.emoteHighlightIndex + 1, matches.length - 1);
+            this._updateEmoteHighlight();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.emoteHighlightIndex = Math.max(this.emoteHighlightIndex - 1, 0);
+            this._updateEmoteHighlight();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            const idx = this.emoteHighlightIndex >= 0 ? this.emoteHighlightIndex : 0;
+            this._completeEmote(matches[idx]);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            this._hideEmoteAutocomplete();
+        }
+    }
+
+    _updateEmoteHighlight() {
+        if (!this.emoteList) return;
+        this.emoteList.querySelectorAll('.emote-suggestion').forEach((el, i) => {
+            el.classList.toggle('highlighted', i === this.emoteHighlightIndex);
+        });
+    }
+
+    _hideEmoteAutocomplete() {
+        if (this.emotePopup) this.emotePopup.classList.add('hidden');
+        this.emoteHighlightIndex = -1;
+        this._currentEmoteMatches = [];
+    }
+
+    // Emote picker (grid menu)
+
+    _setupEmotePicker() {
+        this.emotePickerBtn = document.getElementById('emote-picker-btn');
+        this.emotePickerPopup = document.getElementById('emote-picker-popup');
+        this.emotePickerGrid = document.getElementById('emote-picker-grid');
+        this.emotePickerSearch = document.getElementById('emote-picker-search');
+        if (!this.emotePickerBtn || !this.emotePickerPopup || !this.emotePickerGrid) return;
+
+        this.emotePickerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleEmotePicker();
+        });
+        if (this.emotePickerSearch) {
+            this.emotePickerSearch.addEventListener('input', () => {
+                this._renderEmotePicker(this.emotePickerSearch.value.trim().toLowerCase());
+            });
+        }
+        document.addEventListener('click', (e) => {
+            if (!this.emotePickerPopup.contains(e.target) && e.target !== this.emotePickerBtn) {
+                this._hideEmotePicker();
+            }
+        });
+    }
+
+    _toggleEmotePicker() {
+        if (this.emotePickerPopup.classList.contains('hidden')) {
+            this._renderEmotePicker('');
+            this.emotePickerPopup.classList.remove('hidden');
+            if (this.emotePickerSearch) {
+                this.emotePickerSearch.value = '';
+                this.emotePickerSearch.focus();
+            }
+        } else {
+            this._hideEmotePicker();
+        }
+    }
+
+    _hideEmotePicker() {
+        if (this.emotePickerPopup) this.emotePickerPopup.classList.add('hidden');
+    }
+
+    _renderEmotePicker(filter) {
+        if (!this.emotePickerGrid) return;
+        this.emotePickerGrid.innerHTML = '';
+        const list = filter
+            ? this.emotes.filter(e => e.code.toLowerCase().includes(filter))
+            : this.emotes;
+        if (list.length === 0) {
+            this.emotePickerGrid.innerHTML = '<div class="emote-picker-empty">No emotes</div>';
+            return;
+        }
+        list.forEach(emote => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'emote-picker-item';
+            btn.title = emote.code;
+            btn.innerHTML = `<img src="${emote.url}" alt="${this._escapeHtml(emote.code)}">`;
+            btn.addEventListener('click', () => {
+                this._insertEmoteCode(emote.code);
+                this._hideEmotePicker();
+            });
+            this.emotePickerGrid.appendChild(btn);
+        });
     }
 
     updateStatus(status) {
