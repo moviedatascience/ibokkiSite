@@ -15,3 +15,4 @@ debug.log
 # Cloudflared tunnel configuration (contains secrets)
 deploy/cloudflared/config.yml
 deploy/cloudflared/*.json
+deploy/cloudflared/*.json
