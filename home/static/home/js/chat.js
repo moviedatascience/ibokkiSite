@@ -430,19 +430,46 @@ class ChatUI {
         if (this.inputForm) {
             this.inputForm.addEventListener('submit', (e) => {
                 e.preventDefault();
-                const message = this.inputField.value.trim();
-
-                if (message) {
-                    if (message.startsWith('/')) {
-                        this.chatClient.sendCommand(message);
-                    } else {
-                        this.chatClient.sendMessage(message);
-                    }
-                    this.inputField.value = '';
-                    this._hideSlashPopup();
-                }
+                this._submitMessage();
             });
         }
+        if (this.inputField) {
+            // Enter sends, Shift+Enter inserts a newline (destiny-style; no Send button).
+            this.inputField.addEventListener('keydown', (e) => this._onInputKeydown(e));
+            this.inputField.addEventListener('input', () => this._autoResizeInput());
+        }
+    }
+
+    _onInputKeydown(e) {
+        if (e.key !== 'Enter' || e.shiftKey) return;
+        // When the slash-command or emote popup is open, let its own handler
+        // claim Enter (to complete a command/emote) instead of sending.
+        const slashOpen = this.slashPopup && !this.slashPopup.classList.contains('hidden');
+        const emoteOpen = this.emotePopup && !this.emotePopup.classList.contains('hidden');
+        if (slashOpen || emoteOpen) return;
+        e.preventDefault();
+        this._submitMessage();
+    }
+
+    _submitMessage() {
+        const message = this.inputField.value.trim();
+        if (!message) return;
+        if (message.startsWith('/')) {
+            this.chatClient.sendCommand(message);
+        } else {
+            this.chatClient.sendMessage(message);
+        }
+        this.inputField.value = '';
+        this._autoResizeInput();
+        this._hideSlashPopup();
+        this._hideEmoteAutocomplete();
+    }
+
+    _autoResizeInput() {
+        const el = this.inputField;
+        if (!el || el.tagName !== 'TEXTAREA') return;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 128) + 'px';
     }
 
     getRoleClass(data) {
