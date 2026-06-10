@@ -344,6 +344,10 @@ class ChatUI {
         this.emoteMap = {};
         this.emoteCodes = [];
         this.emoteHighlightIndex = -1;
+        this.favoriteCodes = new Set();
+
+        // User highlight filter (left-click a username)
+        this.highlightedUser = null;
 
         this.setupEventHandlers();
     }
@@ -368,6 +372,9 @@ class ChatUI {
         this._loadEmotes();
         this._setupEmoteAutocomplete();
         this._setupEmotePicker();
+        this._setupChatInteractions();
+        this._setupUserCardModal();
+        this._setupEmoteModal();
         return true;
     }
 
@@ -486,11 +493,8 @@ class ChatUI {
         if (data.viewing_stream) {
             messageDiv.dataset.viewingStream = data.viewing_stream;
         }
-
-        if (this.eyeFilterActive && data.viewing_stream && data.viewing_stream !== this.chatClient.viewingStream) {
-            messageDiv.classList.add('chat-message-dimmed');
-            console.log('[EyeFilter] dimmed msg from', data.user, '(viewing:', data.viewing_stream, ', mine:', this.chatClient.viewingStream, ')');
-        }
+        messageDiv.dataset.username = data.user;
+        messageDiv.dataset.role = data.role || (data.is_staff ? 'admin' : 'user');
 
         const timestamp = data.timestamp ? new Date(data.timestamp * 1000) : new Date();
         const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -498,10 +502,11 @@ class ChatUI {
 
         messageDiv.innerHTML = `
             <span class="text-[10px] text-gray-500 mr-1">${timeStr}</span>
-            <span class="${userClass} mr-1 cursor-pointer hover:underline" onclick="window.chatUI.insertMention('${data.user}')">${data.user}:</span>
+            <span class="chat-username ${userClass} mr-1 cursor-pointer hover:underline">${this._escapeHtml(data.user)}:</span>
             <span class="message-content text-gray-200">${data.message}</span>
         `;
 
+        this._applyFiltersToElement(messageDiv);
         this.messageContainer.appendChild(messageDiv);
         this.scrollToBottom();
         this.limitMessages();
@@ -807,24 +812,29 @@ class ChatUI {
             btn.classList.toggle('active', this.eyeFilterActive);
         }
         console.log('[EyeToggle] active:', this.eyeFilterActive, '| myStream:', this.chatClient.viewingStream);
-        this._applyEyeFilter();
+        this._applyMessageFilters();
     }
 
-    _applyEyeFilter() {
+    // Applies both dim filters (eye toggle + user highlight) to one message.
+    _applyFiltersToElement(el) {
+        const vs = el.dataset.viewingStream;
+        const dimEye = this.eyeFilterActive && vs && vs !== this.chatClient.viewingStream;
+        const isHighlightedUser = this.highlightedUser && el.dataset.username === this.highlightedUser;
+        const dimUser = this.highlightedUser && !isHighlightedUser;
+        el.classList.toggle('chat-message-dimmed', !!(dimEye || dimUser));
+        el.classList.toggle('chat-message-highlighted', !!isHighlightedUser);
+    }
+
+    _applyMessageFilters() {
         if (!this.messageContainer) return;
-        const myStream = this.chatClient.viewingStream;
-        let total = 0, dimmed = 0;
         this.messageContainer.querySelectorAll('.chat-message').forEach(el => {
-            total++;
-            const vs = el.dataset.viewingStream;
-            if (this.eyeFilterActive && vs && vs !== myStream) {
-                el.classList.add('chat-message-dimmed');
-                dimmed++;
-            } else {
-                el.classList.remove('chat-message-dimmed');
-            }
+            this._applyFiltersToElement(el);
         });
-        console.log('[EyeFilter] applied:', this.eyeFilterActive, '| myStream:', myStream, '| dimmed:', dimmed, '/', total);
+    }
+
+    toggleUserHighlight(username) {
+        this.highlightedUser = (this.highlightedUser === username) ? null : username;
+        this._applyMessageFilters();
     }
 
     // --- Slash Command Popup ---
@@ -941,6 +951,7 @@ class ChatUI {
                 });
                 // Longest-first so prefix matches favour the more specific code.
                 this.emoteCodes.sort((a, b) => b.length - a.length);
+                this.favoriteCodes = new Set(data.favorites || []);
             })
             .catch(() => { /* emotes are non-critical; chat still works */ });
     }
@@ -1104,6 +1115,11 @@ class ChatUI {
                 this._hideEmotePicker();
             }
         });
+        // Mobile: tap-and-hold a picker emote opens the emote modal.
+        this._addLongPress(this.emotePickerGrid, (target) => {
+            const item = target.closest('.emote-picker-item');
+            if (item && item.dataset.code) this.openEmoteModal(item.dataset.code);
+        });
     }
 
     _toggleEmotePicker() {
@@ -1133,18 +1149,273 @@ class ChatUI {
             this.emotePickerGrid.innerHTML = '<div class="emote-picker-empty">No emotes</div>';
             return;
         }
-        list.forEach(emote => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'emote-picker-item';
-            btn.title = emote.code;
-            btn.innerHTML = `<img src="${emote.url}" alt="${this._escapeHtml(emote.code)}">`;
-            btn.addEventListener('click', () => {
-                this._insertEmoteCode(emote.code);
-                this._hideEmotePicker();
-            });
-            this.emotePickerGrid.appendChild(btn);
+        const favs = list.filter(e => this.favoriteCodes.has(e.code));
+        const rest = list.filter(e => !this.favoriteCodes.has(e.code));
+
+        if (favs.length > 0) {
+            this._appendPickerHeader('Favorites');
+            favs.forEach(emote => this._appendPickerItem(emote, true));
+            if (rest.length > 0) this._appendPickerHeader('All Emotes');
+        }
+        rest.forEach(emote => this._appendPickerItem(emote, false));
+    }
+
+    _appendPickerHeader(label) {
+        const header = document.createElement('div');
+        header.className = 'emote-picker-header';
+        header.textContent = label;
+        this.emotePickerGrid.appendChild(header);
+    }
+
+    _appendPickerItem(emote, pinned) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'emote-picker-item';
+        btn.title = emote.code;
+        btn.dataset.code = emote.code;
+        const pinOverlay = pinned
+            ? '<span class="emote-pin-icon"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 3a1 1 0 011 1v1.586l2.207 2.207a1 1 0 01-.083 1.49L15 12.5V17a1 1 0 01-.293.707L13 19.414V21a1 1 0 01-2 0v-1.586l-1.707-1.707A1 1 0 019 17v-4.5L4.876 9.283a1 1 0 01-.083-1.49L7 5.586V4a1 1 0 011-1h8z"/></svg></span>'
+            : '';
+        btn.innerHTML = `<img src="${emote.url}" alt="${this._escapeHtml(emote.code)}">${pinOverlay}`;
+        btn.addEventListener('click', () => {
+            this._insertEmoteCode(emote.code);
+            this._hideEmotePicker();
         });
+        btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.openEmoteModal(emote.code);
+        });
+        this.emotePickerGrid.appendChild(btn);
+    }
+
+    // --- Chat interactions (username click/right-click, emote right-click) ---
+
+    _setupChatInteractions() {
+        if (!this.messageContainer) return;
+
+        this.messageContainer.addEventListener('click', (e) => {
+            const nameEl = e.target.closest('.chat-username');
+            if (nameEl) {
+                const msgEl = nameEl.closest('.chat-message');
+                if (msgEl && msgEl.dataset.username) {
+                    this.toggleUserHighlight(msgEl.dataset.username);
+                }
+            }
+        });
+
+        this.messageContainer.addEventListener('contextmenu', (e) => {
+            this._handleChatContextTarget(e.target) && e.preventDefault();
+        });
+
+        // Mobile: tap-and-hold mirrors right-click.
+        this._addLongPress(this.messageContainer, (target) => {
+            this._handleChatContextTarget(target);
+        });
+    }
+
+    // Returns true if the target opened a modal (so contextmenu can preventDefault).
+    _handleChatContextTarget(target) {
+        const nameEl = target.closest && target.closest('.chat-username');
+        if (nameEl) {
+            const msgEl = nameEl.closest('.chat-message');
+            if (msgEl) {
+                this.openUserCard(msgEl);
+                return true;
+            }
+        }
+        const emoteEl = target.closest && target.closest('.inline-emote');
+        if (emoteEl) {
+            const code = emoteEl.getAttribute('alt');
+            if (code && this.emoteMap[code]) {
+                this.openEmoteModal(code);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    _addLongPress(el, handler, delay = 500) {
+        let timer = null;
+        el.addEventListener('touchstart', (e) => {
+            const target = e.target;
+            timer = setTimeout(() => {
+                timer = null;
+                this._suppressNextClick = Date.now();
+                handler(target);
+            }, delay);
+        }, { passive: true });
+        ['touchmove', 'touchend', 'touchcancel'].forEach(ev => {
+            el.addEventListener(ev, () => {
+                if (timer) clearTimeout(timer);
+                timer = null;
+            }, { passive: true });
+        });
+    }
+
+    // Positions a modal as a card covering the chat messages area, so it works
+    // in both the side-panel and popout layouts.
+    _positionOverChat(modal) {
+        const rect = this.messageContainer.getBoundingClientRect();
+        modal.style.left = (rect.left + 8) + 'px';
+        modal.style.top = (rect.top + 8) + 'px';
+        modal.style.width = (rect.width - 16) + 'px';
+        modal.style.maxHeight = (rect.height - 16) + 'px';
+    }
+
+    _roleLabel(role) {
+        const labels = { admin: 'Admin', moderator: 'Moderator', subscriber: 'Subscriber', user: 'User' };
+        return labels[role] || 'User';
+    }
+
+    // --- User card modal (right-click a username) ---
+
+    _setupUserCardModal() {
+        this.userCardModal = document.getElementById('user-card-modal');
+        if (!this.userCardModal) return;
+        const closeBtn = document.getElementById('user-card-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this._hideUserCard());
+        const mentionBtn = document.getElementById('user-card-mention');
+        if (mentionBtn) {
+            mentionBtn.addEventListener('click', () => {
+                if (this._userCardUsername) this.insertMention(this._userCardUsername);
+                this._hideUserCard();
+            });
+        }
+        this._setupModalDismiss(this.userCardModal, () => this._hideUserCard());
+    }
+
+    openUserCard(msgEl) {
+        if (!this.userCardModal) return;
+        const username = msgEl.dataset.username;
+        const role = msgEl.dataset.role || 'user';
+        const watching = msgEl.dataset.viewingStream || '';
+        this._userCardUsername = username;
+
+        const nameEl = document.getElementById('user-card-name');
+        nameEl.textContent = username;
+        nameEl.className = ROLE_COLORS[role] || ROLE_COLORS.user;
+
+        document.getElementById('user-card-watching').textContent = watching || 'Unknown';
+        document.getElementById('user-card-tier').textContent = this._roleLabel(role);
+
+        const msgList = document.getElementById('user-card-messages');
+        msgList.innerHTML = '';
+        this.messageContainer.querySelectorAll('.chat-message').forEach(el => {
+            if (el.dataset.username !== username) return;
+            const content = el.querySelector('.message-content');
+            if (!content) return;
+            const row = document.createElement('div');
+            row.className = 'user-card-msg';
+            row.innerHTML = `<span class="${ROLE_COLORS[role] || ROLE_COLORS.user}">${this._escapeHtml(username)}:</span> <span class="text-gray-200">${content.innerHTML}</span>`;
+            msgList.appendChild(row);
+        });
+
+        this._positionOverChat(this.userCardModal);
+        this._modalOpenedAt = Date.now();
+        this.userCardModal.classList.remove('hidden');
+    }
+
+    _hideUserCard() {
+        if (this.userCardModal) this.userCardModal.classList.add('hidden');
+    }
+
+    // --- Emote modal (right-click an emote in chat or in the picker) ---
+
+    _setupEmoteModal() {
+        this.emoteModal = document.getElementById('emote-modal');
+        if (!this.emoteModal) return;
+        const closeBtn = document.getElementById('emote-modal-close');
+        if (closeBtn) closeBtn.addEventListener('click', () => this._hideEmoteModal());
+        const starBtn = document.getElementById('emote-modal-star');
+        if (starBtn) {
+            starBtn.addEventListener('click', () => {
+                if (this._emoteModalCode) this._toggleFavorite(this._emoteModalCode);
+            });
+        }
+        this._setupModalDismiss(this.emoteModal, () => this._hideEmoteModal());
+    }
+
+    openEmoteModal(code) {
+        if (!this.emoteModal) return;
+        const emote = this.emoteMap[code];
+        if (!emote) return;
+        this._emoteModalCode = code;
+
+        const img = document.getElementById('emote-modal-img');
+        img.src = emote.url;
+        img.alt = code;
+        document.getElementById('emote-modal-code').textContent = code;
+        this._updateEmoteModalStar();
+
+        const rect = this.messageContainer.getBoundingClientRect();
+        this.emoteModal.style.left = (rect.left + rect.width / 2) + 'px';
+        this.emoteModal.style.top = (rect.top + rect.height / 2) + 'px';
+        this._modalOpenedAt = Date.now();
+        this.emoteModal.classList.remove('hidden');
+    }
+
+    _hideEmoteModal() {
+        if (this.emoteModal) this.emoteModal.classList.add('hidden');
+        this._emoteModalCode = null;
+    }
+
+    _updateEmoteModalStar() {
+        const starBtn = document.getElementById('emote-modal-star');
+        if (!starBtn || !this._emoteModalCode) return;
+        const favorited = this.favoriteCodes.has(this._emoteModalCode);
+        starBtn.classList.toggle('favorited', favorited);
+        const label = starBtn.querySelector('.star-label');
+        if (label) label.textContent = favorited ? 'Favorited' : 'Favorite';
+    }
+
+    _toggleFavorite(code) {
+        const favorited = !this.favoriteCodes.has(code);
+        // Optimistic update; reverted if the server rejects.
+        if (favorited) this.favoriteCodes.add(code); else this.favoriteCodes.delete(code);
+        this._updateEmoteModalStar();
+        this._refreshPickerIfOpen();
+
+        fetch('/emotes/favorite/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'X-CSRFToken': this._getCookie('csrftoken'),
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ code, favorited: String(favorited) }),
+        }).then(r => {
+            if (!r.ok) throw new Error('favorite toggle failed');
+        }).catch(() => {
+            if (favorited) this.favoriteCodes.delete(code); else this.favoriteCodes.add(code);
+            this._updateEmoteModalStar();
+            this._refreshPickerIfOpen();
+        });
+    }
+
+    _refreshPickerIfOpen() {
+        if (this.emotePickerPopup && !this.emotePickerPopup.classList.contains('hidden')) {
+            const filter = this.emotePickerSearch ? this.emotePickerSearch.value.trim().toLowerCase() : '';
+            this._renderEmotePicker(filter);
+        }
+    }
+
+    // Shared dismiss behavior: click outside or Escape closes the modal. The
+    // opening gesture itself is ignored via a short grace period, since a
+    // long-press can emit a synthetic click right after the modal opens.
+    _setupModalDismiss(modal, hide) {
+        document.addEventListener('click', (e) => {
+            if (modal.classList.contains('hidden')) return;
+            if (Date.now() - (this._modalOpenedAt || 0) < 300) return;
+            if (!modal.contains(e.target)) hide();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) hide();
+        });
+    }
+
+    _getCookie(name) {
+        const match = document.cookie.match(new RegExp('(^|;\\s*)' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[2]) : '';
     }
 
     updateStatus(status) {

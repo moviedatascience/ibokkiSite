@@ -344,6 +344,20 @@ def _invalidate_emote_manifest(sender, **kwargs):
     Emote.clear_manifest_cache()
 
 
+class EmoteFavorite(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='emote_favorites')
+    emote = models.ForeignKey(Emote, on_delete=models.CASCADE, related_name='favorites')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'emote'], name='unique_user_emote_favorite'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} favorites {self.emote.code}"
+
+
 class UserTimeout(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='timeouts_received'

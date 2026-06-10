@@ -161,7 +161,7 @@
                 const streamId = streamKey.replace('/', '_');
                 if (window.chatUI && window.chatUI.chatClient) {
                     window.chatUI.chatClient.switchStream(streamId);
-                    window.chatUI._applyEyeFilter();
+                    window.chatUI._applyMessageFilters();
                 }
             }
         });

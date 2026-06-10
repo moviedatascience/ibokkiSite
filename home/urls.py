@@ -10,6 +10,7 @@ urlpatterns = [
     path('reset-password/<str:token>/', views.reset_password_view, name='reset_password'),
     path('watch/', views.watch, name='watch'),
     path('emotes/manifest/', views.emote_manifest, name='emote_manifest'),
+    path('emotes/favorite/', views.toggle_emote_favorite, name='toggle_emote_favorite'),
     path('switch-stream/', views.switch_stream, name='switch_stream'),
     path('profile/', views.profile_view, name='profile'),
 ]

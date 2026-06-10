@@ -9,7 +9,9 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from .models import StreamSettings, Invitation, PasswordResetToken, Emote
+from .models import StreamSettings, Invitation, PasswordResetToken, Emote, EmoteFavorite
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.http import JsonResponse
 import logging
@@ -378,6 +380,7 @@ def profile_view(request):
 # Watch View
 # ---------------------------------------------------------------------------
 @login_required
+@ensure_csrf_cookie
 def watch(request):
     featured_stream = StreamSettings.objects.filter(is_featured=True, is_active=True).first()
     active_streams = StreamSettings.objects.filter(is_active=True)
@@ -423,7 +426,25 @@ def watch(request):
 # ---------------------------------------------------------------------------
 @login_required
 def emote_manifest(request):
-    return JsonResponse({'emotes': Emote.get_manifest()})
+    favorites = list(
+        EmoteFavorite.objects.filter(user=request.user).values_list('emote__code', flat=True)
+    )
+    return JsonResponse({'emotes': Emote.get_manifest(), 'favorites': favorites})
+
+
+@login_required
+@require_POST
+def toggle_emote_favorite(request):
+    code = request.POST.get('code', '')
+    favorited = request.POST.get('favorited') == 'true'
+    emote = Emote.objects.filter(code=code).first()
+    if not emote:
+        return JsonResponse({'ok': False, 'error': 'Unknown emote'}, status=404)
+    if favorited:
+        EmoteFavorite.objects.get_or_create(user=request.user, emote=emote)
+    else:
+        EmoteFavorite.objects.filter(user=request.user, emote=emote).delete()
+    return JsonResponse({'ok': True, 'favorited': favorited})
 
 
 # ---------------------------------------------------------------------------

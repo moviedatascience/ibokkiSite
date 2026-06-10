@@ -62,6 +62,40 @@
     </form>
 </div>
 
+<!-- User card modal (hidden by default; positioned over chat by JS) -->
+<div id="user-card-modal" class="hidden fixed z-[70] bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-xl flex flex-col overflow-hidden">
+    <div class="flex justify-between items-center px-4 py-3 border-b border-gray-700">
+        <span id="user-card-name" class="font-bold text-white"></span>
+        <div class="flex items-center gap-1">
+            <button type="button" id="user-card-mention" class="px-2 py-1 text-xs text-gray-400 hover:text-white rounded transition-colors" title="Mention this user">@ Mention</button>
+            <button type="button" id="user-card-close" class="p-1 text-gray-400 hover:text-white rounded transition-colors" title="Close">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+    <div class="px-4 py-2 border-b border-gray-700 text-xs text-gray-400">
+        <div class="py-0.5">Watching: <span id="user-card-watching" class="text-blue-400"></span></div>
+        <div class="py-0.5">Tier: <span id="user-card-tier" class="text-gray-300"></span></div>
+    </div>
+    <div class="px-4 py-1 text-xs text-gray-500">Messages:</div>
+    <div id="user-card-messages" class="flex-1 overflow-y-auto px-4 pb-3 text-sm space-y-1"></div>
+</div>
+
+<!-- Emote modal (hidden by default; centered over chat by JS) -->
+<div id="emote-modal" class="hidden fixed z-[70] bg-[#1a1a2e] border border-gray-700 rounded-lg shadow-xl p-4 text-center" style="transform: translate(-50%, -50%); min-width: 160px;">
+    <div class="flex justify-end">
+        <button type="button" id="emote-modal-close" class="p-1 text-gray-400 hover:text-white rounded transition-colors" title="Close">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+    <img id="emote-modal-img" src="" alt="" class="mx-auto max-h-20 max-w-[120px] my-2">
+    <div id="emote-modal-code" class="font-bold text-white text-sm mb-3"></div>
+    <button type="button" id="emote-modal-star" class="emote-star-btn mx-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-colors">
+        <svg class="w-4 h-4 star-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+        <span class="star-label">Favorite</span>
+    </button>
+</div>
+
 <style>
 .chat-message {
     word-wrap: break-word;
@@ -162,5 +196,64 @@
     font-size: 12px;
     text-align: center;
     padding: 16px;
+}
+.chat-message-highlighted {
+    background-color: rgba(59, 130, 246, 0.12);
+    border-radius: 4px;
+}
+.chat-username {
+    -webkit-user-select: none;
+    user-select: none;
+}
+.inline-emote,
+.emote-picker-item img {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+.emote-picker-header {
+    grid-column: 1 / -1;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 2px 2px;
+}
+.emote-picker-item {
+    position: relative;
+}
+.emote-pin-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+    color: #e2e8f0;
+    background: rgba(0,0,0,0.6);
+    border-radius: 9999px;
+    padding: 1px;
+    line-height: 0;
+}
+.emote-pin-icon svg {
+    width: 12px;
+    height: 12px;
+}
+.user-card-msg {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+#user-card-modal {
+    max-width: 480px;
+}
+.emote-star-btn {
+    color: #94a3b8;
+    background-color: rgba(255,255,255,0.06);
+}
+.emote-star-btn:hover {
+    color: #e2e8f0;
+    background-color: rgba(255,255,255,0.12);
+}
+.emote-star-btn.favorited {
+    color: #facc15;
+    background-color: rgba(250, 204, 21, 0.12);
 }
 </style>
