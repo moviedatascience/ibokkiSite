@@ -23,6 +23,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . /app/
 
+# Ensure the volume mount points exist at build time so that freshly created
+# named volumes (media_volume, static_volume) inherit appuser ownership instead
+# of defaulting to root. Without this, uploads to /app/media fail with a
+# PermissionError (500) because the container runs as the non-root appuser.
+RUN mkdir -p /app/media /app/staticfiles
+
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
