@@ -496,12 +496,9 @@ class ChatUI {
         messageDiv.dataset.username = data.user;
         messageDiv.dataset.role = data.role || (data.is_staff ? 'admin' : 'user');
 
-        const timestamp = data.timestamp ? new Date(data.timestamp * 1000) : new Date();
-        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const userClass = this.getRoleClass(data);
 
         messageDiv.innerHTML = `
-            <span class="text-[10px] text-gray-500 mr-1">${timeStr}</span>
             <span class="chat-username ${userClass} mr-1 cursor-pointer hover:underline">${this._escapeHtml(data.user)}:</span>
             <span class="message-content text-gray-200">${data.message}</span>
         `;
@@ -1252,14 +1249,15 @@ class ChatUI {
         });
     }
 
-    // Positions a modal as a card covering the chat messages area, so it works
-    // in both the side-panel and popout layouts.
+    // Positions a modal as a compact card anchored to the top of the chat
+    // messages area, so it works in both the side-panel and popout layouts.
+    // Height is capped; the messages list inside scrolls.
     _positionOverChat(modal) {
         const rect = this.messageContainer.getBoundingClientRect();
         modal.style.left = (rect.left + 8) + 'px';
         modal.style.top = (rect.top + 8) + 'px';
         modal.style.width = (rect.width - 16) + 'px';
-        modal.style.maxHeight = (rect.height - 16) + 'px';
+        modal.style.maxHeight = Math.min(400, rect.height - 16) + 'px';
     }
 
     _roleLabel(role) {
