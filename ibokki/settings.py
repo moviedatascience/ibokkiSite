@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "channels",
+    "oauth2_provider",
     "home.apps.HomeConfig",
     "csp",
     "corsheaders",
@@ -183,6 +184,32 @@ TWITCH_PARENT_DOMAIN = os.getenv('TWITCH_PARENT_DOMAIN', 'localhost' if ENVIRONM
 # Auth settings
 LOGIN_URL = "/"
 LOGIN_REDIRECT_URL = "/home/"
+
+# ---------------------------------------------------------------------------
+# OpenID Connect provider (django-oauth-toolkit)
+# ibokki acts as the IdP for the self-hosted Fluxer chat at chat.ibokki.com.
+# Fluxer is configured (instance SSO) with issuer = f"{BASE_URL}/o".
+# ---------------------------------------------------------------------------
+# RSA key used to sign OIDC ID tokens. Generate with:
+#   openssl genrsa 4096
+# and store the PEM in the OIDC_RSA_PRIVATE_KEY env var (newlines preserved).
+OIDC_RSA_PRIVATE_KEY = os.getenv("OIDC_RSA_PRIVATE_KEY", "")
+
+OAUTH2_PROVIDER = {
+    "OIDC_ENABLED": True,
+    "OIDC_RSA_PRIVATE_KEY": OIDC_RSA_PRIVATE_KEY,
+    "OIDC_ISS_ENDPOINT": f"{BASE_URL}/o",
+    # Fluxer is a confidential client (exchanges a client secret), so PKCE is
+    # optional rather than mandatory — accepted if sent, not required.
+    "PKCE_REQUIRED": False,
+    "OAUTH2_VALIDATOR_CLASS": "home.oauth_validators.IbokkiOAuth2Validator",
+    "SCOPES": {
+        "openid": "OpenID Connect",
+        "profile": "Display name and username",
+        "email": "Email address",
+        "roles": "ibokki role (user/subscriber/moderator/admin)",
+    },
+}
 
 # Email settings (ProtonMail SMTP)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

@@ -38,6 +38,11 @@ POSTGRES_PASSWORD=your-postgres-password
 # Redis
 REDIS_URL=redis://localhost:6379
 
+# OpenID Connect provider (used by Fluxer SSO at chat.ibokki.com)
+# RSA private key (PEM) that signs OIDC ID tokens. Generate with: openssl genrsa 4096
+# Paste the full PEM including BEGIN/END lines (multi-line values are supported).
+OIDC_RSA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+
 # External APIs
 YOUTUBE_API_KEY=your-youtube-api-key
 KICK_CLIENT_ID=your-kick-client-id
