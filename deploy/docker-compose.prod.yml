@@ -1,0 +1,104 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    # No host port: only reachable on the internal Docker network.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ibokki
+      POSTGRES_USER: ibokki
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    # No host port: only reachable on the internal Docker network.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ibokki -d ibokki"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: ..
+    command: gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 ibokki.wsgi:application
+    volumes:
+      - ..:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - BASE_URL=https://ibokki.com
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://localhost:8000/health/').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  websocket:
+    build: ..
+    command: daphne -b 0.0.0.0 -p 8001 ibokki.asgi:application
+    volumes:
+      - ..:/app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - BASE_URL=https://ibokki.com
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgres://ibokki:${POSTGRES_PASSWORD}@db:5432/ibokki
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/static:ro
+      - media_volume:/media:ro
+    restart: unless-stopped
+    # No host port: cloudflared reaches nginx over the internal network
+    # (config.yml -> service: http://nginx:80), so nothing is exposed publicly.
+    depends_on:
+      - web
+      - websocket
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    restart: unless-stopped
+    depends_on:
+      - nginx
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
