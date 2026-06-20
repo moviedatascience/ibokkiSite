@@ -58,7 +58,16 @@
 
     <!-- FIXED NAVIGATION BAR -->
     <nav class="fixed top-0 left-0 w-full h-[3.5rem] z-40 bg-youtube-nav text-youtube-primary flex justify-between items-center px-4">
-        <a href="{% url 'landing' %}" class="text-xl font-bold">Ibokki</a>
+        <!-- Left: navigation -->
+        <div class="flex items-center gap-1">
+            <a href="{% url 'landing' %}" class="px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Home</a>
+            <a href="{% url 'forum_index' %}" class="px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Forum</a>
+            <a href="https://chat.ibokki.com" class="px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Chat</a>
+            <a href="{% url 'watch' %}" class="px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Live</a>
+        </div>
+        <!-- Center: brand -->
+        <a href="{% url 'landing' %}" class="absolute left-1/2 -translate-x-1/2 text-xl font-bold">Ibokki</a>
+        <!-- Right: profile -->
         <div class="flex items-center">
             {% if user.is_authenticated %}
                 <div class="relative">
