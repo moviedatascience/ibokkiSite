@@ -1,400 +1,196 @@
-# Deployment Guide for iBokki
+# iBokki Deployment
 
-This guide covers deploying the iBokki streaming application with full WebSocket support, Redis channel layers, and proper production configuration.
+How iBokki is built, deployed, and operated. The whole system runs as a Docker
+Compose stack fronted by a Cloudflare Tunnel, with a simple git-based deploy
+flow across three environments.
 
-## Architecture Overview
+---
 
-The production deployment uses:
-- **Gunicorn** (WSGI) for HTTP requests on port 8000
-- **Daphne** (ASGI) for WebSocket connections on port 8001  
-- **Redis** for Django Channels message passing
-- **Nginx** as reverse proxy and load balancer
-- **Django Channels Workers** for background processing
-- **Cloudflare Tunnel** for exposing services securely (optional)
+## Architecture
 
+The stack is a single Docker Compose project. Every environment runs the same
+set of containers:
 
-## Prerequisites
+| Service | Image / build | Role |
+|---------|---------------|------|
+| `web` | built from `Dockerfile` | Django HTTP via **gunicorn** (port 8000) |
+| `websocket` | built from `Dockerfile` | Django Channels via **daphne** (port 8001) — chat WebSockets |
+| `db` | `postgres:15-alpine` | PostgreSQL database |
+| `redis` | `redis:7-alpine` | Channels layer (WebSocket message passing) |
+| `nginx` | `nginx:alpine` | Reverse proxy; routes `/`, `/ws/`, `/static/`, `/media/` |
+| `cloudflared` | `cloudflare/cloudflared` | **Cloudflare Tunnel** — the only ingress |
 
-- Docker and Docker Compose
-- Redis server (or use Docker)
-- PostgreSQL database (or use Docker)
-- SSL certificates for production
+**Traffic flow:** `user → Cloudflare edge → tunnel (cloudflared) → nginx → web/websocket`.
 
-## Environment Variables
+Because `cloudflared` makes an **outbound** connection to Cloudflare, the host
+needs **no inbound HTTP ports open** — Cloudflare terminates TLS at its edge.
+In production (`docker-compose.prod.yml`) no container publishes a host port at
+all; the only thing exposed on the server is SSH.
 
-Create a `.env` file with the following variables:
+iBokki also acts as an **OpenID Connect provider** (`/o/...`, via
+`django-oauth-toolkit`) so the self-hosted Fluxer chat can use ibokki accounts
+for SSO. See the OIDC settings in `ibokki/settings.py`.
+
+---
+
+## Environments
+
+| Env | Host | URL | Compose file | Branch |
+|-----|------|-----|--------------|--------|
+| **dev** | your local machine | `localhost:8000` | `docker-compose.yml` | feature branches |
+| **staging** | WSL box | `staging.ibokki.com` | `docker-compose.staging.yml` | the branch under test |
+| **prod** | Vultr (Atlanta) | `ibokki.com` | `docker-compose.prod.yml` | `main` |
+
+`main` is the production branch. Staging and prod each have their **own
+Cloudflare tunnel** so they can never interfere. Staging uses a separate Compose
+project name (`ibokki-staging`) so its data volumes are isolated.
+
+---
+
+## Compose files
+
+- **`docker-compose.yml`** — local dev. Publishes ports and bind-mounts the repo
+  for fast iteration.
+- **`docker-compose.staging.yml`** — staging on WSL. Mirrors prod
+  (`DEBUG=False`), serves `staging.ibokki.com` via `cloudflared-staging/`,
+  project name `ibokki-staging`.
+- **`docker-compose.prod.yml`** — production. No published host ports,
+  `restart: unless-stopped`, healthchecks, read-only mounts.
+
+---
+
+## Environment variables (`deploy/.env`)
+
+Compose reads `deploy/.env`. It is gitignored — never commit it. Required keys:
 
 ```bash
-# Django Settings
-SECRET_KEY=your-secret-key-here
-DEBUG=False
-ENVIRONMENT=production
-BASE_URL=https://ibokki.com
-
-# Database
-DATABASE_URL=postgres://user:password@localhost:5432/ibokki
-POSTGRES_PASSWORD=your-postgres-password
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# OpenID Connect provider (used by Fluxer SSO at chat.ibokki.com)
-# RSA private key (PEM) that signs OIDC ID tokens. Generate with: openssl genrsa 4096
-# Paste the full PEM including BEGIN/END lines (multi-line values are supported).
-OIDC_RSA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-
-# External APIs
-YOUTUBE_API_KEY=your-youtube-api-key
-KICK_CLIENT_ID=your-kick-client-id
-KICK_CLIENT_SECRET=your-kick-client-secret
+# Django
+SECRET_KEY=...
+POSTGRES_PASSWORD=...
 
 # Email (ProtonMail SMTP)
 EMAIL_HOST_USER=loremipsum@ibokki.com
-EMAIL_HOST_PASSWORD=your-protonmail-smtp-token
+EMAIL_HOST_PASSWORD=...
 DEFAULT_FROM_EMAIL=loremipsum@ibokki.com
 
-# Cloudflare Tunnel
+# OIDC provider signing key (used by Fluxer SSO).
+# Multi-line PEM — MUST be wrapped in double quotes so python-dotenv keeps it intact.
+OIDC_RSA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----"
 ```
 
-### Supported `.env` locations
+`DEBUG`, `ENVIRONMENT`, `BASE_URL`, `REDIS_URL`, and `DATABASE_URL` are set per
+environment inside each compose file's `environment:` block.
 
-- **Local development (`manage.py`)** – place your `.env` in the project root (`ibokkiSite/.env`).
-- **Docker Compose (`deploy/docker-compose.yml`)** – Docker Compose automatically searches for an `.env` that sits beside the compose file, so use `ibokkiSite/deploy/.env` when running the services defined there.
+---
 
-Both locations are now supported by the Django settings loader, so you can keep separate environment files for local development and containerized deployments. Cloudflare tunnels now rely on the configuration and credentials files described below, so no additional environment variables are required. The legacy token-based `TUNNEL_TOKEN` approach is deprecated in this project.
+## Deploy workflow (dev → staging → prod)
 
-## Cloudflare Tunnel Setup
-
-The Docker Compose stack now mounts a Cloudflare configuration directory from
-`deploy/cloudflared` into the container at `/etc/cloudflared`. Follow these
-steps to provide the necessary files:
-
-1. **Create a named tunnel** in the Cloudflare dashboard (Zero Trust → Access →
-   Tunnels) or by running `cloudflared tunnel create` locally.
-2. **Download the credentials file** that Cloudflare generates for the tunnel
-   (a JSON file named `<TUNNEL_UUID>.json`). Place this file in
-   `deploy/cloudflared/` so it gets mounted into the container as
-   `/etc/cloudflared/<TUNNEL_UUID>.json`.
-3. **Copy the sample configuration**:
+1. **Branch** off `main`: `git checkout -b feature/x`.
+2. **Develop locally** and run the dev stack:
+   `docker compose -f deploy/docker-compose.yml up -d --build`
+3. **Test on staging** — push the branch, check it out on WSL, and start the
+   staging stack (see below). Validate the real tunnel, SSO, and **migrations**
+   against a copy of prod data.
+4. **Merge to `main`** and push.
+5. **Deploy to prod** — on the Vultr box:
    ```bash
-   cp deploy/cloudflared/config.example.yml deploy/cloudflared/config.yml
+   cd ~/ibokkiSite
+   bash deploy/deploy.sh
    ```
-   Edit `config.yml` and replace the placeholder tunnel UUID, credentials
-   filename (including the `/etc/cloudflared/` prefix), and hostname with the
-   values from your Cloudflare account. The `service: http://nginx:80` entry is
-   important—it tells Cloudflare to forward traffic to the Nginx container
-   inside the Compose network so both HTTP and WebSocket requests reach the
-   app.
-4. (Optional) If you manage DNS through Cloudflare, make sure the hostname you
-   specified in `config.yml` points to the tunnel.
-5. Start the tunnel with Docker Compose once the config and credentials are in
-   place:
-   ```bash
-   docker-compose -f deploy/docker-compose.yml up -d cloudflared
-   ```
+   `deploy.sh` pulls `main`, rebuilds images, runs migrations + collectstatic,
+   and restarts services. Only `web`/`websocket` recreate (a ~2s blip); the
+   tunnel, db, and redis stay up.
 
-You can tail the tunnel logs to verify the connection:
+---
+
+## Staging (WSL)
+
+One-time setup:
+
+1. **Create a second Cloudflare tunnel** (separate from prod) named e.g.
+   `ibokki-staging`, in Zero Trust → Networks → Tunnels, or:
+   `cloudflared tunnel create ibokki-staging`.
+2. Put its `<UUID>.json` credentials in `deploy/cloudflared-staging/`.
+3. `cp deploy/cloudflared-staging/config.example.yml deploy/cloudflared-staging/config.yml`
+   and fill in the staging tunnel UUID + credentials filename.
+4. Point **`staging.ibokki.com`** at the staging tunnel (a proxied CNAME to
+   `<UUID>.cfargotunnel.com`, or a public hostname on the tunnel).
+
+Run staging on WSL:
 ```bash
-docker-compose -f deploy/docker-compose.yml logs -f cloudflared
+docker compose -f deploy/docker-compose.staging.yml up -d --build
 ```
 
-## Deployment Options
-
-### Option 1: Docker Compose (Recommended)
-
-1. **Build and start services:**
+Refresh staging data from the latest prod backup at any time:
 ```bash
-docker-compose -f deploy/docker-compose.yml up -d
+PROD_HOST=root@<prod-ip> bash deploy/refresh-staging.sh
 ```
 
-2. **Run migrations:**
+Staging only needs to be running while you are actively testing.
+
+---
+
+## Backups & restore
+
+`deploy/backup.sh` (prod, nightly via cron at 04:00) writes a gzipped
+`pg_dump` and a tar of the media volume to `~/ibokki-backups`, keeping 14 days:
+
 ```bash
-docker-compose -f deploy/docker-compose.yml exec web python manage.py migrate
+0 4 * * * /root/ibokkiSite/deploy/backup.sh >> /var/log/ibokki-backup.log 2>&1
 ```
 
-3. **Create superuser:**
+Only the **database and uploaded media** are backed up — everything else is
+reproducible from this repo.
+
+**Restore** (e.g. onto a fresh host) is the same flow used in the cloud
+migration — see `CLOUD_MIGRATION.md`:
 ```bash
-docker-compose -f deploy/docker-compose.yml exec web python manage.py createsuperuser
+gunzip -c db_YYYYMMDD.sql.gz | docker compose -f deploy/docker-compose.prod.yml exec -T db psql -U ibokki -d ibokki
+docker run --rm -v deploy_media_volume:/data -v "$PWD":/backup alpine sh -c "rm -rf /data/* && tar xzf /backup/media_YYYYMMDD.tgz -C /data"
 ```
 
-4. **Collect static files:**
-```bash
-docker-compose -f deploy/docker-compose.yml exec web python manage.py collectstatic --noinput
+---
+
+## Cloudflare Tunnel
+
+Each environment's tunnel is config-file managed. The config points at the
+internal nginx so both HTTP and WebSocket reach the app:
+
+```yaml
+tunnel: <UUID>
+credentials-file: /etc/cloudflared/<UUID>.json
+ingress:
+  - hostname: ibokki.com          # staging.ibokki.com for staging
+    service: http://nginx:80
+  - service: http_status:404
 ```
 
-5. **Start Cloudflare tunnel (optional, after configuring `deploy/cloudflared/`):**
-```bash
-docker-compose -f deploy/docker-compose.yml up -d cloudflared
-```
+Config + credentials live in `deploy/cloudflared/` (prod) and
+`deploy/cloudflared-staging/` (staging), both gitignored. DNS is a proxied CNAME
+to `<UUID>.cfargotunnel.com`, created in the Cloudflare dashboard. The tunnel's
+credentials JSON must be readable by the container user (`chmod 644`).
 
-### Option 2: Manual Deployment
+---
 
-1. **Install Redis:**
-```bash
-# Ubuntu/Debian
-sudo apt-get install redis-server
-sudo systemctl enable redis-server
-sudo systemctl start redis-server
+## First-time host setup & migration
 
-# Or use Docker
-docker run -d --name redis -p 6379:6379 redis:7-alpine
-```
+To stand up a brand-new production host (provisioning, Docker install, data
+restore, tunnel cutover), follow **`CLOUD_MIGRATION.md`**.
 
-2. **Install dependencies:**
-```bash
-pip install -r requirements.txt
-```
-
-3. **Apply migrations:**
-```bash
-python manage.py migrate
-```
-
-4. **Collect static files:**
-```bash
-python manage.py collectstatic --noinput
-```
-
-5. **Start services:**
-
-**Terminal 1 - Gunicorn (HTTP):**
-```bash
-chmod +x deploy/start_gunicorn.sh
-./deploy/start_gunicorn.sh
-```
-
-**Terminal 2 - Daphne (WebSocket):**
-```bash
-chmod +x deploy/start_daphne.sh
-```
-
-## Nginx Configuration
-
-1. **Install Nginx:**
-```bash
-sudo apt-get install nginx
-```
-
-2. **Copy configuration:**
-```bash
-sudo cp deploy/nginx.conf /etc/nginx/sites-available/ibokki
-sudo ln -s /etc/nginx/sites-available/ibokki /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default  # Remove default site
-```
-
-3. **Test and reload:**
-```bash
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-## SSL/HTTPS Setup
-
-1. **Install Certbot:**
-```bash
-sudo apt-get install certbot python3-certbot-nginx
-```
-
-2. **Get SSL certificate:**
-```bash
-sudo certbot --nginx -d ibokki.com -d www.ibokki.com
-```
-
-3. **Auto-renewal:**
-```bash
-sudo crontab -e
-# Add this line:
-0 12 * * * /usr/bin/certbot renew --quiet
-```
-
-## Process Management
-
-### Using systemd (Recommended for production)
-
-1. **Create service files:**
-
-**gunicorn.service:**
-```ini
-[Unit]
-Description=Gunicorn instance to serve iBokki
-After=network.target
-
-[Service]
-User=www-data
-Group=www-data
-WorkingDirectory=/path/to/ibokkiSite
-Environment="PATH=/path/to/ibokkiSite/venv/bin"
-ExecStart=/path/to/ibokkiSite/venv/bin/gunicorn --workers 3 --bind unix:/path/to/ibokkiSite/ibokki.sock ibokki.wsgi:application
-ExecReload=/bin/kill -s HUP $MAINPID
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-
-**daphne.service:**
-```ini
-[Unit]
-Description=Daphne instance to serve iBokki WebSockets
-After=network.target
-
-[Service]
-User=www-data
-Group=www-data
-WorkingDirectory=/path/to/ibokkiSite
-Environment="PATH=/path/to/ibokkiSite/venv/bin"
-ExecStart=/path/to/ibokkiSite/venv/bin/daphne -u /path/to/ibokkiSite/daphne.sock ibokki.asgi:application
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-
-Before creating a systemd service for Cloudflare, copy the same
-`deploy/cloudflared/config.yml` and credentials JSON you prepared for Docker
-Compose into `/etc/cloudflared/` so the service can read them. The config file
-should continue to reference the credentials file with an absolute path such as
-`/etc/cloudflared/<TUNNEL_UUID>.json`.
-
-**cloudflared.service:**
-```ini
-[Unit]
-Description=Cloudflare Tunnel
-After=network.target
-
-[Service]
-User=www-data
-WorkingDirectory=/etc/cloudflared
-ExecStart=/usr/bin/cloudflared tunnel --config /etc/cloudflared/config.yml run
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
-> **Note:** Running Cloudflare Tunnel with just a token (`cloudflared tunnel run`
-> and a `TUNNEL_TOKEN`) is still supported by Cloudflare but deprecated in this
-> project. Stick to the config/credentials-file flow so the Compose stack,
-> systemd units, and documentation all align on the same setup.
-
-2. **Enable and start services:**
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable gunicorn daphne channels-worker cloudflared
-sudo systemctl start gunicorn daphne channels-worker cloudflared
-
-```
-
-## Monitoring and Logs
-
-1. **View service status:**
-```bash
-sudo systemctl status gunicorn daphne
-```
-
-2. **View logs:**
-```bash
-sudo journalctl -u gunicorn -f
-sudo journalctl -u daphne -f
-```
-
-3. **Application logs:**
-```bash
-tail -f debug.log
-```
-
-## Performance Tuning
-
-### Redis Configuration
-Add to `/etc/redis/redis.conf`:
-```
-maxmemory 512mb
-maxmemory-policy allkeys-lru
-```
-
-### Django Settings for Production
-```python
-# Enable database connection pooling
-DATABASES['default']['CONN_MAX_AGE'] = 60
-
-# Cache configuration
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        }
-    }
-}
-```
-
-## Scaling
-
-### Horizontal Scaling
-- Run multiple Gunicorn workers: `--workers 4`
-- Run multiple Daphne instances on different ports
-- Use Redis Cluster for high availability
-
-### Monitoring
-- Set up Redis monitoring
-- Monitor WebSocket connection counts
-- Track message queue length
-- Monitor database performance
+---
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **WebSocket connections failing:**
-   - Check if Daphne is running on port 8001
-   - Verify Nginx WebSocket proxy configuration
-   - Check firewall rules
-
-2. **Chat messages not appearing:**
-   - Verify Redis is running and accessible
-   - Ensure proper Redis URL configuration
-
-3. **High memory usage:**
-   - Monitor Redis memory usage
-   - Check for message queue backlog
-   - Consider implementing message TTL
-
-### Health Checks
-
-```bash
-# Check HTTP service
-curl http://localhost:8000/health/
-
-# Check WebSocket service
-curl --include \
-     --no-buffer \
-     --header "Connection: Upgrade" \
-     --header "Upgrade: websocket" \
-     --header "Sec-WebSocket-Key: SGVsbG8sIHdvcmxkIQ==" \
-     --header "Sec-WebSocket-Version: 13" \
-     http://localhost:8001/ws/chat/
-
-# Check Redis
-redis-cli ping
-```
-
-## Security Considerations
-
-1. **Firewall Configuration:**
-   - Only expose ports 80 and 443 to the internet
-   - Restrict Redis access to localhost
-   - Use VPN for database access
-
-2. **Environment Variables:**
-   - Never commit `.env` files to version control
-   - Use secrets management in production
-   - Rotate secrets regularly
-
-3. **Rate Limiting:**
-   - Configure Nginx rate limiting for WebSocket connections
-   - Implement application-level rate limiting
-   - Monitor for abuse patterns
-``` 
+- **502 from Cloudflare:** the tunnel can't reach the origin. Check the tunnel
+  connected: `docker compose -f deploy/docker-compose.prod.yml logs --tail=20 cloudflared` (look for "Registered tunnel connection"); confirm `nginx` is up.
+- **`cloudflared` "permission denied" on credentials:** `chmod 644 deploy/cloudflared/*.json`.
+- **WebSockets not connecting:** confirm `redis` and `websocket` are healthy and
+  nginx is proxying `/ws/` to `websocket:8001`.
+- **`web` shows `unhealthy` but the site works:** the healthcheck must use
+  `127.0.0.1` (gunicorn binds IPv4 only); `localhost` resolves to IPv6 first.
+- **Changes not visible after deploy:** purge the Cloudflare cache (the HTML can
+  be edge-cached); static assets are content-hashed so they bust automatically.
+- **`git` "dubious ownership"** on a server repo owned by root:
+  `git config --global --add safe.directory /root/ibokkiSite`.

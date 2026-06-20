@@ -29,7 +29,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'fallback_key')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 
-ALLOWED_HOSTS = ["ibokki.com", "www.ibokki.com", "localhost", "127.0.0.1", ".ngrok-free.app"]
+ALLOWED_HOSTS = ["ibokki.com", "www.ibokki.com", "staging.ibokki.com", "localhost", "127.0.0.1", ".ngrok-free.app"]
 
 
 # Application definition
@@ -237,8 +237,8 @@ SECURE_REFERRER_POLICY = "no-referrer-when-downgrade"
 SECURE_HSTS_SECONDS = 31536000  # 1 year
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
-CSRF_TRUSTED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
-CORS_ALLOWED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'http://localhost:8000']
+CSRF_TRUSTED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'https://staging.ibokki.com', 'http://localhost:8000']
+CORS_ALLOWED_ORIGINS = ['https://ibokki.com', 'https://www.ibokki.com', 'https://staging.ibokki.com', 'http://localhost:8000']
 CORS_ALLOW_CREDENTIALS = True
 
 # Append slash settings

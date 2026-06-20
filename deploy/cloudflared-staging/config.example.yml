@@ -1,0 +1,20 @@
+# Staging Cloudflare Tunnel configuration — a SEPARATE tunnel from production.
+# Copy this file to deploy/cloudflared-staging/config.yml and fill in the
+# staging tunnel's UUID, credentials filename, and hostname.
+#
+# Create the tunnel in the Cloudflare Zero Trust dashboard (or with
+# `cloudflared tunnel create ibokki-staging`), download its <UUID>.json
+# credentials file into this folder, then point staging.ibokki.com at it.
+
+# The STAGING tunnel UUID (NOT the production one).
+tunnel: YOUR_STAGING_TUNNEL_UUID
+
+# Credentials JSON downloaded from Cloudflare for the staging tunnel.
+credentials-file: /etc/cloudflared/YOUR_STAGING_TUNNEL_UUID.json
+
+ingress:
+  - hostname: staging.ibokki.com
+    # Forwards to the staging nginx inside this Compose network.
+    service: http://nginx:80
+  # Catch-all so other hostnames return 404 instead of hanging.
+  - service: http_status:404
