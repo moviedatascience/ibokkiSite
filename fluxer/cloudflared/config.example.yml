@@ -1,0 +1,19 @@
+# Cloudflare Tunnel config for the Fluxer chat hostname.
+# Copy to fluxer/cloudflared/config.yml (gitignored) on the host and fill in
+# the tunnel UUID, credentials filename, and hostname for the environment:
+#   prod:    chat.ibokki.com
+#   staging: chat-staging.ibokki.com
+#
+# Create the tunnel + credentials with:
+#   cloudflared tunnel create fluxer-prod        # or fluxer-staging
+#   cloudflared tunnel route dns --overwrite-dns <UUID> chat.ibokki.com
+# then copy ~/.cloudflared/<UUID>.json into fluxer/cloudflared/.
+
+tunnel: YOUR_FLUXER_TUNNEL_UUID
+credentials-file: /etc/cloudflared/YOUR_FLUXER_TUNNEL_UUID.json
+
+ingress:
+  - hostname: chat.ibokki.com
+    # Routes through the SSO injector (which proxies to Fluxer's Caddy).
+    service: http://sso-injector:80
+  - service: http_status:404

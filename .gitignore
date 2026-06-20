@@ -17,3 +17,6 @@ deploy/cloudflared/config.yml
 deploy/cloudflared/*.json
 deploy/cloudflared-staging/config.yml
 deploy/cloudflared-staging/*.json
+# Fluxer host-local tunnel config + credentials (the .example template is committed)
+fluxer/cloudflared/config.yml
+fluxer/cloudflared/*.json

@@ -1,0 +1,25 @@
+# Compose override for the Fluxer stack: adds the SSO injector + a Cloudflare
+# tunnel, both on Fluxer's `fluxer` network. Apply alongside Fluxer's own file:
+#
+#   docker compose -f docker-compose.yml -f cloudflared.compose.yml up -d
+#
+# cloudflared routes the chat hostname -> sso-injector -> caddy. Tunnel config
+# and credentials live in ./cloudflared/ (gitignored; see config.example.yml).
+services:
+  sso-injector:
+    image: nginx:alpine
+    networks: [fluxer]
+    volumes:
+      - ./sso-injector.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./sso-auto.js:/assets/sso-auto.js:ro
+    restart: unless-stopped
+    depends_on: [caddy]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: ["tunnel", "--config", "/etc/cloudflared/config.yml", "run"]
+    networks: [fluxer]
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    restart: unless-stopped
+    depends_on: [sso-injector]
