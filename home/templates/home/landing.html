@@ -1,36 +1,98 @@
 {% extends "home/base.html" %}
-
 {% load static %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8 pt-[4.5rem]">
-    <div class="flex flex-col">
-        <!-- Main Content Section -->
-        <div class="w-full">
-            <div class="relative rounded-lg overflow-hidden" style="padding-top: 56.25%;"> <!-- 16:9 aspect ratio -->
-                <img
-                    src="{% static 'home/images/online.jpg' %}"
-                    alt="Stream is Live"
-                    class="absolute top-0 left-0 w-full h-full object-cover"
-                />
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-5xl space-y-6">
+
+    <!-- ============ Latest Videos ============ -->
+    <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
+        <div class="flex items-center justify-between px-4 py-2 bg-youtube-nav border-b border-youtube">
+            <h2 class="font-semibold text-youtube-primary text-sm uppercase tracking-wide">Latest Videos</h2>
+            <a href="{% url 'watch' %}" class="text-xs text-red-500 hover:text-red-400">Watch live &rarr;</a>
+        </div>
+        <div class="p-4">
+            {% if latest_videos %}
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {% for v in latest_videos %}
+                <a href="{{ v.url }}" target="_blank" rel="noopener" class="group block">
+                    <div class="relative rounded overflow-hidden bg-youtube-secondary" style="padding-top:56.25%;">
+                        {% if v.thumbnail %}
+                        <img src="{{ v.thumbnail }}" alt="{{ v.title }}" class="absolute inset-0 w-full h-full object-cover">
+                        {% endif %}
+                    </div>
+                    <p class="mt-1.5 text-xs font-semibold text-youtube-primary leading-snug line-clamp-2 group-hover:text-white">{{ v.title }}</p>
+                    <p class="text-[11px] text-youtube-secondary mt-0.5">{{ v.channel_name }}</p>
+                    {% if v.published_dt %}<p class="text-[11px] text-youtube-secondary">{{ v.published_dt|timesince }} ago</p>{% endif %}
+                </a>
+                {% endfor %}
             </div>
-            <div class="mt-4">
-                <h1 class="text-2xl font-bold text-youtube-primary">{{ current_stream_title }}</h1>
-                <p class="text-youtube-secondary mt-2">Stream is Live on Kick</p>
-                <div class="mt-6 flex gap-4">
-                    <a href="{% url 'watch' %}" class="bg-[#ff0000] text-youtube-primary px-6 py-3 rounded-lg hover:bg-[#cc0000] focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors">
-                        Watch Stream
+            {% else %}
+            <p class="text-sm text-youtube-secondary py-4 text-center">No videos to show yet. An admin can add tracked YouTube channels in the Django admin.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- ============ Latest Forum Posts ============ -->
+    <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
+        <div class="flex items-center justify-between px-4 py-2 bg-youtube-nav border-b border-youtube">
+            <h2 class="font-semibold text-youtube-primary text-sm uppercase tracking-wide">Latest Forum Posts</h2>
+            <a href="{% url 'forum_index' %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">Show all</a>
+        </div>
+        <div>
+            {% if latest_posts %}
+            <ul class="divide-y divide-[#272727]">
+                {% for post in latest_posts %}
+                <li class="flex items-center justify-between px-4 py-2.5 hover:bg-youtube-secondary transition-colors">
+                    <a href="{% url 'forum_thread' post.thread.pk %}" class="text-sm text-youtube-primary hover:underline truncate">
+                        {{ post.thread.title }}
+                        <span class="text-youtube-secondary">({{ post.thread.category.name }})</span>
                     </a>
-                    <a href="#" class="bg-youtube-secondary text-youtube-primary px-6 py-3 rounded-lg hover:bg-youtube-secondary focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors">
-                        Subscribe
-                    </a>
-                </div>
-                <div class="mt-8 p-4 bg-youtube-secondary rounded-lg border border-youtube">
-                    <h3 class="font-semibold mb-2 text-youtube-primary">Stream Information</h3>
-                    <p class="text-sm text-youtube-secondary">Join our community to watch streams, chat with other viewers, and get notified when we go live!</p>
-                </div>
+                    <span class="text-xs text-youtube-secondary whitespace-nowrap ml-3">
+                        by {{ post.author.display_name|default:post.author.username }} &middot; {{ post.created_at|timesince }} ago
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="text-sm text-youtube-secondary py-6 text-center">
+                No forum posts yet. <a href="{% url 'forum_index' %}" class="text-red-500 hover:text-red-400">Start a discussion &rarr;</a>
+            </p>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- ============ Latest Announcement ============ -->
+    <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
+        <div class="flex items-center justify-between px-4 py-2 bg-youtube-nav border-b border-youtube">
+            <h2 class="font-semibold text-youtube-primary text-sm uppercase tracking-wide">Latest Announcement</h2>
+            <div class="flex items-center gap-3">
+                {% if user.role == 'admin' or user.is_staff or user.is_superuser %}
+                <a href="{% url 'announcement_admin' %}" class="text-xs text-red-500 hover:text-red-400">Manage</a>
+                {% endif %}
+                <a href="{% url 'announcement_list' %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">Show all</a>
             </div>
         </div>
-    </div>
+        <div class="p-4">
+            {% if latest_announcement %}
+            <a href="{% url 'announcement_detail' latest_announcement.pk %}" class="block group">
+                <h3 class="text-lg font-bold text-youtube-primary group-hover:text-white">{{ latest_announcement.title }}</h3>
+                <p class="text-xs text-youtube-secondary mt-0.5">
+                    posted by {{ latest_announcement.author.display_name|default:latest_announcement.author.username|default:"admin" }}
+                    &middot; {{ latest_announcement.created_at|timesince }} ago
+                </p>
+                {% if latest_announcement.banner_image %}
+                <img src="{{ latest_announcement.banner_image.url }}" alt="" class="mt-3 rounded max-h-80 w-full object-contain bg-youtube-dark">
+                {% endif %}
+                {% if latest_announcement.body %}
+                <p class="mt-3 text-sm text-youtube-secondary whitespace-pre-line line-clamp-4">{{ latest_announcement.body }}</p>
+                {% endif %}
+                <span class="inline-block mt-3 text-xs text-red-500 group-hover:text-red-400">Read more &rarr;</span>
+            </a>
+            {% else %}
+            <p class="text-sm text-youtube-secondary py-4 text-center">No announcements yet.</p>
+            {% endif %}
+        </div>
+    </section>
+
 </div>
 {% endblock %}

@@ -1,0 +1,37 @@
+{% extends "home/base.html" %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-5xl space-y-4">
+
+    <div class="flex items-center justify-between">
+        <div>
+            <a href="{% url 'forum_index' %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">&larr; Forum</a>
+            <h1 class="text-2xl font-bold text-youtube-primary">{{ category.name }}</h1>
+            {% if category.description %}<p class="text-sm text-youtube-secondary">{{ category.description }}</p>{% endif %}
+        </div>
+        <a href="{% url 'forum_new_thread' category.slug %}" class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] text-sm whitespace-nowrap">+ New Thread</a>
+    </div>
+
+    <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
+        {% if threads %}
+        <ul class="divide-y divide-[#272727]">
+            {% for t in threads %}
+            <li class="flex items-center justify-between px-4 py-3 hover:bg-youtube-secondary transition-colors">
+                <a href="{% url 'forum_thread' t.pk %}" class="min-w-0">
+                    <span class="text-youtube-primary hover:underline truncate block">
+                        {% if t.is_pinned %}<span class="text-red-500">[pinned]</span> {% endif %}{% if t.is_locked %}🔒 {% endif %}{{ t.title }}
+                    </span>
+                    <span class="text-xs text-youtube-secondary">by {{ t.author.display_name|default:t.author.username }}</span>
+                </a>
+                <span class="text-xs text-youtube-secondary whitespace-nowrap ml-3">
+                    {{ t.reply_count }} repl{{ t.reply_count|pluralize:"y,ies" }} &middot; {{ t.last_activity|timesince }} ago
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-youtube-secondary p-6 text-center">No threads here yet. Be the first to post.</p>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}

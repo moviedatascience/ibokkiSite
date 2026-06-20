@@ -1,0 +1,38 @@
+{% extends "home/base.html" %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-4xl space-y-4">
+
+    <div>
+        <a href="{% url 'forum_category' thread.category.slug %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">&larr; {{ thread.category.name }}</a>
+        <h1 class="text-2xl font-bold text-youtube-primary">{% if thread.is_locked %}🔒 {% endif %}{{ thread.title }}</h1>
+    </div>
+
+    {% if messages %}{% for m in messages %}<p class="text-sm text-red-400">{{ m }}</p>{% endfor %}{% endif %}
+
+    <div class="space-y-3">
+        {% for post in posts %}
+        <article class="rounded-lg border border-youtube bg-youtube-primary">
+            <div class="flex items-center justify-between px-4 py-2 bg-youtube-nav border-b border-youtube">
+                <span class="text-sm font-semibold text-youtube-primary">{{ post.author.display_name|default:post.author.username }}</span>
+                <span class="text-xs text-youtube-secondary">{{ post.created_at|timesince }} ago</span>
+            </div>
+            <div class="px-4 py-3 text-sm text-youtube-primary whitespace-pre-line break-words">{{ post.content }}</div>
+        </article>
+        {% endfor %}
+    </div>
+
+    {% if thread.is_locked and not user.is_staff and user.role != 'admin' %}
+    <p class="text-sm text-youtube-secondary text-center py-3">This thread is locked.</p>
+    {% else %}
+    <form method="post" action="{% url 'forum_reply' thread.pk %}" class="rounded-lg border border-youtube bg-youtube-primary p-4 space-y-3">
+        {% csrf_token %}
+        <textarea name="content" rows="4" required placeholder="Write a reply..."
+            class="w-full bg-youtube-secondary text-white placeholder:text-gray-500 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-y"></textarea>
+        <div class="text-right">
+            <button type="submit" class="bg-[#ff0000] text-youtube-primary px-5 py-2 rounded-lg hover:bg-[#cc0000] text-sm">Reply</button>
+        </div>
+    </form>
+    {% endif %}
+
+</div>
+{% endblock %}

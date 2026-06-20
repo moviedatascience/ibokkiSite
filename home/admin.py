@@ -5,7 +5,43 @@ from django.utils.html import format_html
 from .models import (
     CustomUser, StreamSettings, ChatMessage, Emote, Invitation,
     PasswordResetToken, UserTimeout, UserBan, Poll, PollOption, PollVote,
+    TrackedChannel, ForumCategory, ForumThread, ForumPost, Announcement,
 )
+
+
+@admin.register(TrackedChannel)
+class TrackedChannelAdmin(admin.ModelAdmin):
+    list_display = ('name', 'youtube_channel_id', 'is_active')
+    list_editable = ('is_active',)
+    search_fields = ('name', 'youtube_channel_id')
+
+
+@admin.register(ForumCategory)
+class ForumCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'order')
+    list_editable = ('order',)
+    prepopulated_fields = {'slug': ('name',)}
+
+
+@admin.register(ForumThread)
+class ForumThreadAdmin(admin.ModelAdmin):
+    list_display = ('title', 'category', 'author', 'is_pinned', 'is_locked', 'last_activity')
+    list_editable = ('is_pinned', 'is_locked')
+    list_filter = ('category', 'is_pinned', 'is_locked')
+    search_fields = ('title',)
+
+
+@admin.register(ForumPost)
+class ForumPostAdmin(admin.ModelAdmin):
+    list_display = ('thread', 'author', 'created_at')
+    search_fields = ('content',)
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = ('title', 'author', 'is_published', 'created_at')
+    list_editable = ('is_published',)
+    search_fields = ('title', 'body')
 
 
 @admin.register(CustomUser)

@@ -1,0 +1,37 @@
+{% extends "home/base.html" %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-3xl space-y-4">
+
+    <a href="{% url 'announcement_admin' %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">&larr; Manage Announcements</a>
+    <h1 class="text-2xl font-bold text-youtube-primary">Edit Announcement</h1>
+
+    <form method="post" enctype="multipart/form-data" class="rounded-lg border border-youtube bg-youtube-primary p-4 space-y-4">
+        {% csrf_token %}
+        <div>
+            <label class="block text-sm font-medium text-youtube-primary mb-1">Title</label>
+            <input type="text" name="title" maxlength="200" value="{{ announcement.title }}" required
+                class="w-full bg-youtube-secondary text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-youtube-primary mb-1">Body</label>
+            <textarea name="body" rows="6"
+                class="w-full bg-youtube-secondary text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-y">{{ announcement.body }}</textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-youtube-primary mb-1">Banner image</label>
+            {% if announcement.banner_image %}
+            <img src="{{ announcement.banner_image.url }}" alt="" class="mb-2 rounded max-h-40 bg-youtube-dark">
+            {% endif %}
+            <input type="file" name="banner_image" accept="image/*" class="text-sm text-youtube-secondary">
+            <p class="text-xs text-youtube-secondary mt-1">Leave empty to keep the current image.</p>
+        </div>
+        <label class="flex items-center gap-2 text-sm text-youtube-primary">
+            <input type="checkbox" name="is_published" {% if announcement.is_published %}checked{% endif %}> Published
+        </label>
+        <div class="text-right">
+            <button type="submit" class="bg-[#ff0000] text-youtube-primary px-5 py-2 rounded-lg hover:bg-[#cc0000] text-sm">Save</button>
+        </div>
+    </form>
+
+</div>
+{% endblock %}

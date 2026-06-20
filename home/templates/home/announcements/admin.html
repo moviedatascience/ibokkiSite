@@ -1,0 +1,67 @@
+{% extends "home/base.html" %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-3xl space-y-6">
+
+    <h1 class="text-2xl font-bold text-youtube-primary">Manage Announcements</h1>
+    {% if messages %}{% for m in messages %}<p class="text-sm text-green-400">{{ m }}</p>{% endfor %}{% endif %}
+
+    <!-- Create -->
+    <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
+        <div class="px-4 py-2 bg-youtube-nav border-b border-youtube">
+            <h2 class="font-semibold text-youtube-primary text-sm uppercase tracking-wide">New Announcement</h2>
+        </div>
+        <form method="post" enctype="multipart/form-data" class="p-4 space-y-4">
+            {% csrf_token %}
+            <div>
+                <label class="block text-sm font-medium text-youtube-primary mb-1">Title</label>
+                <input type="text" name="title" maxlength="200" required
+                    class="w-full bg-youtube-secondary text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-youtube-primary mb-1">Body</label>
+                <textarea name="body" rows="6"
+                    class="w-full bg-youtube-secondary text-white px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 resize-y"></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-youtube-primary mb-1">Banner image (optional)</label>
+                <input type="file" name="banner_image" accept="image/*" class="text-sm text-youtube-secondary">
+            </div>
+            <label class="flex items-center gap-2 text-sm text-youtube-primary">
+                <input type="checkbox" name="is_published" checked> Published
+            </label>
+            <div class="text-right">
+                <button type="submit" class="bg-[#ff0000] text-youtube-primary px-5 py-2 rounded-lg hover:bg-[#cc0000] text-sm">Create</button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Existing -->
+    <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
+        <div class="px-4 py-2 bg-youtube-nav border-b border-youtube">
+            <h2 class="font-semibold text-youtube-primary text-sm uppercase tracking-wide">All Announcements</h2>
+        </div>
+        {% if announcements %}
+        <ul class="divide-y divide-[#272727]">
+            {% for a in announcements %}
+            <li class="flex items-center justify-between px-4 py-3">
+                <div class="min-w-0">
+                    <a href="{% url 'announcement_detail' a.pk %}" class="text-youtube-primary hover:underline truncate block">{{ a.title }}</a>
+                    <span class="text-xs text-youtube-secondary">{{ a.created_at|timesince }} ago{% if not a.is_published %} &middot; <span class="text-red-500">draft</span>{% endif %}</span>
+                </div>
+                <div class="flex items-center gap-3 whitespace-nowrap ml-3">
+                    <a href="{% url 'announcement_edit' a.pk %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">Edit</a>
+                    <form method="post" action="{% url 'announcement_delete' a.pk %}" onsubmit="return confirm('Delete this announcement?');">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs text-red-500 hover:text-red-400">Delete</button>
+                    </form>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-youtube-secondary p-4 text-center">No announcements yet.</p>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}

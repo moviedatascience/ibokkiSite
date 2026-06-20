@@ -1,7 +1,7 @@
 # home/views.py
 
 import time
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.conf import settings
 from django.contrib.auth import login, authenticate, get_user_model
 from django.contrib.auth.decorators import login_required
@@ -9,9 +9,21 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-from .models import StreamSettings, Invitation, PasswordResetToken, Emote, EmoteFavorite
+from .models import (
+    StreamSettings, Invitation, PasswordResetToken, Emote, EmoteFavorite,
+    TrackedChannel, ForumCategory, ForumThread, ForumPost, Announcement,
+)
+from .youtube import get_latest_videos
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
+from django.utils import timezone
+
+
+def _is_admin(user):
+    """Admins = role 'admin', Django staff, or superuser."""
+    return user.is_authenticated and (
+        getattr(user, 'role', None) == 'admin' or user.is_staff or user.is_superuser
+    )
 from django.contrib import messages
 from django.http import JsonResponse
 import logging
@@ -345,9 +357,18 @@ def landing_page(request):
     else:
         title = 'No Stream Available'
 
+    latest_posts = (
+        ForumPost.objects
+        .select_related('thread', 'thread__category', 'author')
+        .order_by('-created_at')[:6]
+    )
+
     context = {
         "current_stream_title": title,
-        'user': request.user
+        'user': request.user,
+        'latest_videos': get_latest_videos(limit=5),
+        'latest_posts': latest_posts,
+        'latest_announcement': Announcement.objects.filter(is_published=True).first(),
     }
     return render(request, 'home/landing.html', context)
 
@@ -463,3 +484,147 @@ def switch_stream(request):
                     'embed_url': stream.get_embed_url()
                 })
     return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+
+# ---------------------------------------------------------------------------
+# Forum (minimal)
+# ---------------------------------------------------------------------------
+@login_required
+def forum_index(request):
+    categories = ForumCategory.objects.all()
+    recent_threads = (
+        ForumThread.objects.select_related('category', 'author')
+        .order_by('-last_activity')[:15]
+    )
+    return render(request, 'home/forum/index.html', {
+        'categories': categories,
+        'recent_threads': recent_threads,
+    })
+
+
+@login_required
+def forum_category(request, slug):
+    category = get_object_or_404(ForumCategory, slug=slug)
+    threads = category.threads.select_related('author').all()
+    return render(request, 'home/forum/category.html', {
+        'category': category,
+        'threads': threads,
+    })
+
+
+@login_required
+def forum_thread(request, pk):
+    thread = get_object_or_404(
+        ForumThread.objects.select_related('category', 'author'), pk=pk
+    )
+    posts = thread.posts.select_related('author').all()
+    return render(request, 'home/forum/thread.html', {
+        'thread': thread,
+        'posts': posts,
+    })
+
+
+@login_required
+def forum_new_thread(request, slug):
+    category = get_object_or_404(ForumCategory, slug=slug)
+    if request.method == 'POST':
+        title = (request.POST.get('title') or '').strip()
+        content = (request.POST.get('content') or '').strip()
+        if not title or not content:
+            messages.error(request, 'A title and a message are required.')
+        else:
+            thread = ForumThread.objects.create(
+                category=category, title=title[:200], author=request.user,
+                last_activity=timezone.now(),
+            )
+            ForumPost.objects.create(thread=thread, author=request.user, content=content)
+            return redirect('forum_thread', pk=thread.pk)
+    return render(request, 'home/forum/new_thread.html', {'category': category})
+
+
+@login_required
+@require_POST
+def forum_reply(request, pk):
+    thread = get_object_or_404(ForumThread, pk=pk)
+    if thread.is_locked and not _is_admin(request.user):
+        messages.error(request, 'This thread is locked.')
+        return redirect('forum_thread', pk=thread.pk)
+    content = (request.POST.get('content') or '').strip()
+    if content:
+        ForumPost.objects.create(thread=thread, author=request.user, content=content)
+        thread.last_activity = timezone.now()
+        thread.save(update_fields=['last_activity'])
+    else:
+        messages.error(request, 'Reply cannot be empty.')
+    return redirect('forum_thread', pk=thread.pk)
+
+
+# ---------------------------------------------------------------------------
+# Announcements (public list/detail + admin management)
+# ---------------------------------------------------------------------------
+@login_required
+def announcement_list(request):
+    announcements = Announcement.objects.filter(is_published=True)
+    return render(request, 'home/announcements/list.html', {
+        'announcements': announcements,
+    })
+
+
+@login_required
+def announcement_detail(request, pk):
+    announcement = get_object_or_404(Announcement, pk=pk)
+    if not announcement.is_published and not _is_admin(request.user):
+        return redirect('announcement_list')
+    return render(request, 'home/announcements/detail.html', {
+        'announcement': announcement,
+    })
+
+
+@login_required
+def announcement_admin(request):
+    if not _is_admin(request.user):
+        return redirect('landing')
+    if request.method == 'POST':
+        title = (request.POST.get('title') or '').strip()
+        body = (request.POST.get('body') or '').strip()
+        is_published = request.POST.get('is_published') == 'on'
+        if not title:
+            messages.error(request, 'Title is required.')
+        else:
+            Announcement.objects.create(
+                title=title[:200], body=body, author=request.user,
+                is_published=is_published,
+                banner_image=request.FILES.get('banner_image'),
+            )
+            messages.success(request, 'Announcement created.')
+            return redirect('announcement_admin')
+    return render(request, 'home/announcements/admin.html', {
+        'announcements': Announcement.objects.all(),
+    })
+
+
+@login_required
+def announcement_edit(request, pk):
+    if not _is_admin(request.user):
+        return redirect('landing')
+    announcement = get_object_or_404(Announcement, pk=pk)
+    if request.method == 'POST':
+        announcement.title = (request.POST.get('title') or announcement.title).strip()[:200]
+        announcement.body = (request.POST.get('body') or '').strip()
+        announcement.is_published = request.POST.get('is_published') == 'on'
+        if request.FILES.get('banner_image'):
+            announcement.banner_image = request.FILES['banner_image']
+        announcement.save()
+        messages.success(request, 'Announcement updated.')
+        return redirect('announcement_admin')
+    return render(request, 'home/announcements/edit.html', {'announcement': announcement})
+
+
+@login_required
+@require_POST
+def announcement_delete(request, pk):
+    if not _is_admin(request.user):
+        return redirect('landing')
+    get_object_or_404(Announcement, pk=pk).delete()
+    messages.success(request, 'Announcement deleted.')
+    return redirect('announcement_admin')

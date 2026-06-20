@@ -10,6 +10,7 @@ import hashlib
 import secrets
 from datetime import timedelta
 from django.utils import timezone
+from django.utils.text import slugify
 import logging
 
 logger = logging.getLogger(__name__)
@@ -498,3 +499,114 @@ class PollVote(models.Model):
 
     def __str__(self):
         return f"{self.user.username} voted '{self.option.text}' on '{self.poll.question[:30]}'"
+
+
+# ---------------------------------------------------------------------------
+# Home page: tracked YouTube channels (for the "Latest Videos" panel)
+# ---------------------------------------------------------------------------
+class TrackedChannel(models.Model):
+    name = models.CharField(max_length=100, help_text="Display name shown on the home page")
+    youtube_channel_id = models.CharField(
+        max_length=100,
+        help_text="Channel ID (starts with UC...) or an @handle",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.youtube_channel_id})"
+
+
+# ---------------------------------------------------------------------------
+# Forum (minimal): categories -> threads -> posts
+# ---------------------------------------------------------------------------
+class ForumCategory(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    description = models.CharField(max_length=255, blank=True, default='')
+    order = models.PositiveIntegerField(default=0, help_text="Lower numbers show first")
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'Forum categories'
+
+    def __str__(self):
+        return self.name
+
+
+class ForumThread(models.Model):
+    category = models.ForeignKey(ForumCategory, on_delete=models.CASCADE, related_name='threads')
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=220)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='forum_threads'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Bumped whenever a new post is added, for "latest activity" ordering.
+    last_activity = models.DateTimeField(default=timezone.now)
+    is_pinned = models.BooleanField(default=False)
+    is_locked = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-is_pinned', '-last_activity']
+        indexes = [
+            models.Index(fields=['category', '-last_activity']),
+            models.Index(fields=['-last_activity']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.title)[:200] or 'thread'
+            self.slug = base
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def reply_count(self):
+        # Total posts minus the original post.
+        return max(self.posts.count() - 1, 0)
+
+
+class ForumPost(models.Model):
+    thread = models.ForeignKey(ForumThread, on_delete=models.CASCADE, related_name='posts')
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='forum_posts'
+    )
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.author.username} in '{self.thread.title[:30]}'"
+
+
+# ---------------------------------------------------------------------------
+# Announcements (admin-authored; shown on the home page)
+# ---------------------------------------------------------------------------
+class Announcement(models.Model):
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True, default='')
+    banner_image = models.ImageField(upload_to='announcements/', blank=True, null=True)
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='announcements',
+    )
+    is_published = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
