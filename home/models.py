@@ -520,6 +520,12 @@ class TrackedChannel(models.Model):
         return f"{self.name} ({self.youtube_channel_id})"
 
 
+@receiver([post_save, post_delete], sender=TrackedChannel)
+def _invalidate_video_cache(sender, **kwargs):
+    from . import youtube
+    youtube.clear_cache()
+
+
 # ---------------------------------------------------------------------------
 # Forum (minimal): categories -> threads -> posts
 # ---------------------------------------------------------------------------

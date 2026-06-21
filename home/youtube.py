@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 _CACHE_KEY = "home_latest_videos_v1"
 _CACHE_TTL = 1200          # 20 minutes
-_CHANNEL_ID_TTL = 86400    # 1 day for resolved @handle -> UC id
-_PER_CHANNEL = 3
+_CHANNEL_ID_TTL = 86400    # 1 day for resolved @handle/name -> UC id
+_PER_CHANNEL = 5           # fetch enough per channel to compute the true latest N
 _TIMEOUT = 8
 
 
@@ -23,29 +23,59 @@ def _api_key():
     return getattr(settings, "YOUTUBE_API_KEY", None)
 
 
+def clear_cache():
+    """Drop the aggregated video cache (called when tracked channels change)."""
+    cache.delete(_CACHE_KEY)
+
+
 def _resolve_channel_id(ref):
-    """Return a UC... channel id for a UC id or an @handle (cached)."""
+    """Resolve a UC id, @handle, or channel name to a UC... channel id (cached).
+
+    Tries the cheap forHandle lookup first, then falls back to search so a
+    slightly-off handle or a plain channel name still resolves.
+    """
     if not ref:
         return None
-    if not ref.startswith("@"):
+    ref = ref.strip()
+    # Already a channel id.
+    if ref.startswith("UC") and len(ref) >= 20:
         return ref
     ck = f"yt_channel_id:{ref}"
     cached = cache.get(ck)
     if cached:
         return cached
+
+    cid = None
+    handle = ref[1:] if ref.startswith("@") else ref
+    # 1) Official handle lookup (1 unit).
     try:
         url = (
             "https://www.googleapis.com/youtube/v3/channels"
-            f"?part=id&forHandle={ref[1:]}&key={_api_key()}"
+            f"?part=id&forHandle={handle}&key={_api_key()}"
         )
         items = requests.get(url, timeout=_TIMEOUT).json().get("items") or []
         if items:
             cid = items[0]["id"]
-            cache.set(ck, cid, _CHANNEL_ID_TTL)
-            return cid
     except Exception as e:
-        logger.warning("YouTube: failed to resolve handle %s: %s", ref, e)
-    return None
+        logger.warning("YouTube: forHandle failed for %s: %s", ref, e)
+    # 2) Fallback: search by name/handle (100 units, but cached for a day).
+    if not cid:
+        try:
+            url = (
+                "https://www.googleapis.com/youtube/v3/search"
+                f"?part=id&type=channel&maxResults=1&q={handle}&key={_api_key()}"
+            )
+            items = requests.get(url, timeout=_TIMEOUT).json().get("items") or []
+            if items:
+                cid = items[0]["id"]["channelId"]
+        except Exception as e:
+            logger.warning("YouTube: search fallback failed for %s: %s", ref, e)
+
+    if cid:
+        cache.set(ck, cid, _CHANNEL_ID_TTL)
+    else:
+        logger.warning("YouTube: could not resolve channel reference %r", ref)
+    return cid
 
 
 def _uploads_playlist(channel_id):
