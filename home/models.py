@@ -163,11 +163,20 @@ class StreamSettings(models.Model):
         ('kick', 'Kick'),
         ('youtube', 'YouTube'),
         ('twitch', 'Twitch'),
+        ('rumble', 'Rumble'),
+        ('x', 'X (Twitter)'),
     ]
-    
+
     channel_slug = models.CharField(max_length=100, unique=True)
     platform = models.CharField(max_length=10, choices=PLATFORM_CHOICES, default='kick')
     youtube_channel_id = models.CharField(max_length=100, blank=True, null=True, help_text="Required for YouTube streams. Find in channel URL.")
+    embed_id = models.CharField(
+        max_length=100, blank=True, null=True,
+        help_text=(
+            "Rumble: the video/embed id (e.g. v6abcde from the video's Share -> Embed code). "
+            "X: the post/tweet ID that contains the live video (the long number in the post URL)."
+        ),
+    )
     is_featured = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
@@ -184,6 +193,10 @@ class StreamSettings(models.Model):
         # Ensure YouTube channel ID is provided for YouTube streams
         if self.platform == 'youtube' and not self.youtube_channel_id:
             raise ValidationError("YouTube channel ID is required for YouTube streams.")
+
+        # Rumble and X embed a specific video/post by its id.
+        if self.platform in ('rumble', 'x') and not self.embed_id:
+            raise ValidationError(f"An embed id is required for {self.get_platform_display()} streams.")
 
     def save(self, *args, **kwargs):
         if not kwargs.pop('skip_full_clean', False):
@@ -277,6 +290,15 @@ class StreamSettings(models.Model):
         elif self.platform == 'twitch':
             # Use the parent domain from settings
             return f"https://player.twitch.tv/?channel={self.channel_slug}&parent={settings.TWITCH_PARENT_DOMAIN}"
+        elif self.platform == 'rumble':
+            if self.embed_id:
+                return f"https://rumble.com/embed/{self.embed_id}/"
+            return None
+        elif self.platform == 'x':
+            # x.com blocks direct iframing; embed the post via platform.twitter.com.
+            if self.embed_id:
+                return f"https://platform.twitter.com/embed/Tweet.html?id={self.embed_id}"
+            return None
         return None
 
     def __str__(self):

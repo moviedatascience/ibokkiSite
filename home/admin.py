@@ -68,7 +68,7 @@ class CustomUserAdmin(UserAdmin):
 class StreamSettingsAdmin(admin.ModelAdmin):
     list_display = ('channel_slug', 'platform', 'is_featured', 'is_active', 'updated_at', 'updated_by')
     list_filter = ('platform', 'is_featured', 'is_active')
-    search_fields = ('channel_slug', 'youtube_channel_id')
+    search_fields = ('channel_slug', 'youtube_channel_id', 'embed_id')
     ordering = ('-is_featured', '-is_active', '-updated_at')
 
     fieldsets = (
