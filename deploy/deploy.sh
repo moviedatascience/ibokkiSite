@@ -31,6 +31,9 @@ $COMPOSE run --rm web python manage.py collectstatic --noinput
 
 echo "==> [6/6] Restarting services"
 $COMPOSE up -d
+# web/websocket may have been recreated with new container IPs above. nginx
+# caches upstream IPs at startup, so re-point it to avoid a stale-upstream 502.
+$COMPOSE restart nginx
 
 # Clean up dangling images from old builds.
 docker image prune -f >/dev/null 2>&1 || true
