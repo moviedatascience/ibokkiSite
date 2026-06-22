@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 _CACHE_KEY = "home_latest_videos_v1"
 _CACHE_TTL = 1200          # 20 minutes
 _CHANNEL_ID_TTL = 86400    # 1 day for resolved @handle/name -> UC id
-_PER_CHANNEL = 5           # fetch enough per channel to compute the true latest N
+_PER_CHANNEL = 15          # fetched per channel (1 API call); home shows newest 5, /videos shows all
 _TIMEOUT = 8
 
 
@@ -128,7 +128,10 @@ def _latest_from_channel(channel):
 
 
 def get_latest_videos(limit=5):
-    """Latest uploads across active tracked channels, newest first (cached)."""
+    """Uploads across active tracked channels, newest first (cached).
+
+    Pass limit=None to get the full aggregated pool (used by the /videos page).
+    """
     if not _api_key():
         return []
     cached = cache.get(_CACHE_KEY)
@@ -140,4 +143,4 @@ def get_latest_videos(limit=5):
         videos.sort(key=lambda v: v["published_at"], reverse=True)
         cache.set(_CACHE_KEY, videos, _CACHE_TTL)
         cached = videos
-    return cached[:limit]
+    return cached if limit is None else cached[:limit]

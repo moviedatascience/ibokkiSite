@@ -373,6 +373,14 @@ def landing_page(request):
     return render(request, 'home/landing.html', context)
 
 
+@login_required
+def all_videos(request):
+    """Full listing of the latest videos across all tracked channels."""
+    return render(request, 'home/videos.html', {
+        'videos': get_latest_videos(limit=None),
+    })
+
+
 # ---------------------------------------------------------------------------
 # Profile View
 # ---------------------------------------------------------------------------

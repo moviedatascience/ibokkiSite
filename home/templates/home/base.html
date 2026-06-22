@@ -65,8 +65,6 @@
             <a href="https://chat.ibokki.com" class="px-2 sm:px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Chat</a>
             <a href="{% url 'watch' %}" class="px-2 sm:px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Live</a>
         </div>
-        <!-- Center: brand (hidden on small screens to avoid overlapping the links) -->
-        <a href="{% url 'landing' %}" class="hidden sm:block absolute left-1/2 -translate-x-1/2 text-xl font-bold">Ibokki</a>
         <!-- Right: profile -->
         <div class="flex items-center">
             {% if user.is_authenticated %}
