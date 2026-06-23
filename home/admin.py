@@ -7,6 +7,7 @@ from .models import (
     PasswordResetToken, UserTimeout, UserBan, Poll, PollOption, PollVote,
     TrackedChannel, ForumCategory, ForumThread, ForumPost, Announcement,
     Podcast, Subscription, EmailVerificationToken,
+    SubscriptionProduct, Coupon, Transaction,
 )
 
 
@@ -31,6 +32,49 @@ class SubscriptionAdmin(admin.ModelAdmin):
     list_filter = ('podcast', 'is_active')
     search_fields = ('user__username', 'user__email', 'podcast__name')
     autocomplete_fields = ('user', 'podcast')
+
+
+@admin.register(SubscriptionProduct)
+class SubscriptionProductAdmin(admin.ModelAdmin):
+    list_display = ('name', 'podcast', 'monthly_price', 'annual_price', 'is_active')
+    list_editable = ('monthly_price', 'annual_price', 'is_active')
+    list_filter = ('is_active', 'podcast')
+    search_fields = ('name', 'podcast__name')
+    autocomplete_fields = ('podcast',)
+
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display = ('code', 'percent_off', 'applies_to_all', 'is_active', 'times_used', 'max_uses', 'valid_until')
+    list_editable = ('is_active',)
+    list_filter = ('is_active', 'applies_to_all')
+    search_fields = ('code', 'description')
+    filter_horizontal = ('products',)
+    readonly_fields = ('times_used', 'created_at')
+    fieldsets = (
+        (None, {'fields': ('code', 'description', 'percent_off', 'is_active')}),
+        ('Scope', {
+            'fields': ('applies_to_all', 'products'),
+            'description': "Uncheck 'applies to all' and pick products to limit which "
+                           "transaction types this code works on.",
+        }),
+        ('Limits', {'fields': ('valid_from', 'valid_until', 'max_uses', 'times_used', 'created_at')}),
+    )
+
+
+@admin.register(Transaction)
+class TransactionAdmin(admin.ModelAdmin):
+    list_display = ('created_at', 'user', 'product_name', 'billing_interval',
+                    'base_price', 'coupon_code', 'discount_percent', 'final_price', 'status')
+    list_filter = ('status', 'billing_interval')
+    search_fields = ('user__username', 'user__email', 'product_name', 'coupon_code')
+    readonly_fields = ('user', 'product', 'product_name', 'billing_interval', 'base_price',
+                       'coupon', 'coupon_code', 'discount_percent', 'final_price', 'status',
+                       'granted_until', 'created_at', 'completed_at')
+    ordering = ('-created_at',)
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(TrackedChannel)

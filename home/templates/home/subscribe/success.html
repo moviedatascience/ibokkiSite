@@ -1,0 +1,25 @@
+{% extends "home/base.html" %}
+{% block main_classes %}w-full overflow-y-auto{% endblock %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-lg space-y-4">
+
+    <div class="rounded-lg border border-green-700 bg-youtube-primary p-6 text-center space-y-3">
+        <h1 class="text-2xl font-bold text-green-400">You're subscribed!</h1>
+        <p class="text-sm text-youtube-secondary">Your {{ txn.product_name }} subscription is now active.</p>
+
+        <div class="text-left text-sm border-t border-youtube pt-3 mt-3 space-y-1">
+            <div class="flex justify-between text-youtube-secondary"><span>Plan</span><span class="text-youtube-primary">{{ txn.product_name }}</span></div>
+            <div class="flex justify-between text-youtube-secondary"><span>Billing</span><span class="text-youtube-primary">{{ txn.get_billing_interval_display }}</span></div>
+            {% if txn.coupon_code %}<div class="flex justify-between text-youtube-secondary"><span>Coupon</span><span class="text-youtube-primary">{{ txn.coupon_code }} (&minus;{{ txn.discount_percent }}%)</span></div>{% endif %}
+            <div class="flex justify-between text-youtube-secondary"><span>Paid</span><span class="text-youtube-primary">${{ txn.final_price }}</span></div>
+            {% if txn.granted_until %}<div class="flex justify-between text-youtube-secondary"><span>Renews / expires</span><span class="text-youtube-primary">{{ txn.granted_until|date:"M j, Y" }}</span></div>{% endif %}
+        </div>
+
+        <div class="flex gap-2 pt-2">
+            <a href="{% url 'forum_index' %}" class="flex-1 text-center bg-youtube-secondary text-youtube-primary px-4 py-2 rounded-lg hover:opacity-80 text-sm font-semibold">Go to Forum</a>
+            <a href="{% url 'subscribe' %}" class="flex-1 text-center bg-youtube-secondary text-youtube-primary px-4 py-2 rounded-lg hover:opacity-80 text-sm font-semibold">Subscriptions</a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

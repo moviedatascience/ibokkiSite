@@ -4,7 +4,9 @@ from django.db.models import Q
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
+from decimal import Decimal, ROUND_HALF_UP
 import requests
 import hashlib
 import secrets
@@ -755,3 +757,155 @@ class EmailVerificationToken(models.Model):
             return obj if obj.is_valid else None
         except cls.DoesNotExist:
             return None
+
+
+# --- Subscription checkout ---------------------------------------------------
+
+BILLING_MONTHLY = 'monthly'
+BILLING_ANNUAL = 'annual'
+BILLING_INTERVALS = (
+    (BILLING_MONTHLY, 'Monthly'),
+    (BILLING_ANNUAL, 'Annual'),
+)
+
+
+def _money(value):
+    """Round an amount to 2 decimal places."""
+    return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+class SubscriptionProduct(models.Model):
+    """A purchasable subscription that grants access to one Podcast tier.
+    Priced with a monthly rate and a (usually cheaper) annual rate."""
+    name = models.CharField(max_length=120)
+    podcast = models.ForeignKey(
+        Podcast, on_delete=models.CASCADE, related_name='products',
+        help_text="The tier/user class this purchase grants access to.",
+    )
+    description = models.TextField(blank=True, default='')
+    monthly_price = models.DecimalField(
+        max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Price per month.",
+    )
+    annual_price = models.DecimalField(
+        max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))],
+        help_text="Total price for a year (typically discounted vs. 12x monthly).",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def price_for(self, interval):
+        return _money(self.annual_price if interval == BILLING_ANNUAL else self.monthly_price)
+
+    @property
+    def annual_monthly_equivalent(self):
+        """Annual price expressed as a per-month figure, for display."""
+        return _money(self.annual_price / Decimal('12'))
+
+
+class Coupon(models.Model):
+    """A discount code reducing a checkout price by a percentage. Applies either
+    to every product or to a specific set ('transaction types')."""
+    code = models.CharField(max_length=40, unique=True, help_text="Case-insensitive; stored uppercase.")
+    description = models.CharField(max_length=200, blank=True, default='')
+    percent_off = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text="Percentage taken off the price (1-100). 100 = free.",
+    )
+    applies_to_all = models.BooleanField(
+        default=True, help_text="If checked, the code works on every product.",
+    )
+    products = models.ManyToManyField(
+        SubscriptionProduct, blank=True, related_name='coupons',
+        help_text="When 'applies to all' is off, the products this code is valid for.",
+    )
+    is_active = models.BooleanField(default=True)
+    valid_from = models.DateTimeField(null=True, blank=True, help_text="Leave blank for no start limit.")
+    valid_until = models.DateTimeField(null=True, blank=True, help_text="Leave blank for no expiry.")
+    max_uses = models.PositiveIntegerField(null=True, blank=True, help_text="Leave blank for unlimited.")
+    times_used = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['code']
+
+    def __str__(self):
+        return f"{self.code} ({self.percent_off}% off)"
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or '').strip().upper()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def find(cls, code):
+        if not code:
+            return None
+        return cls.objects.filter(code=code.strip().upper()).first()
+
+    def is_redeemable_now(self):
+        now = timezone.now()
+        if not self.is_active:
+            return False
+        if self.valid_from and now < self.valid_from:
+            return False
+        if self.valid_until and now > self.valid_until:
+            return False
+        if self.max_uses is not None and self.times_used >= self.max_uses:
+            return False
+        return True
+
+    def applies_to(self, product):
+        if self.applies_to_all:
+            return True
+        return self.products.filter(pk=product.pk).exists()
+
+    def discount_percent_for(self, product):
+        """Percent this coupon would take off `product`, or 0 if not applicable."""
+        if self.is_redeemable_now() and self.applies_to(product):
+            return self.percent_off
+        return 0
+
+
+class Transaction(models.Model):
+    """A subscription checkout. Only completes when the final price is 0 (i.e. a
+    100% coupon), since no payment processor is wired up yet."""
+    STATUS_PENDING = 'pending'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_COMPLETED, 'Completed'),
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='transactions'
+    )
+    product = models.ForeignKey(
+        SubscriptionProduct, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='transactions',
+    )
+    product_name = models.CharField(max_length=120, help_text="Snapshot of product name at purchase.")
+    billing_interval = models.CharField(max_length=10, choices=BILLING_INTERVALS, default=BILLING_MONTHLY)
+    base_price = models.DecimalField(max_digits=8, decimal_places=2)
+    coupon = models.ForeignKey(
+        Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='transactions'
+    )
+    coupon_code = models.CharField(max_length=40, blank=True, default='')
+    discount_percent = models.PositiveSmallIntegerField(default=0)
+    final_price = models.DecimalField(max_digits=8, decimal_places=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    granted_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'status'])]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.product_name} ({self.get_status_display()})"

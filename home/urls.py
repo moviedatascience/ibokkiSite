@@ -13,6 +13,11 @@ urlpatterns = [
     path('watch/', views.watch, name='watch'),
     path('videos/', views.all_videos, name='all_videos'),
 
+    # Subscription checkout
+    path('subscribe/', views.subscribe_index, name='subscribe'),
+    path('subscribe/<int:product_id>/checkout/', views.checkout, name='checkout'),
+    path('subscribe/success/<int:pk>/', views.checkout_success, name='checkout_success'),
+
     # Forum
     path('forum/', views.forum_index, name='forum_index'),
     path('forum/c/<slug:slug>/', views.forum_category, name='forum_category'),

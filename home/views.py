@@ -13,12 +13,16 @@ from .models import (
     StreamSettings, Invitation, PasswordResetToken, Emote, EmoteFavorite,
     TrackedChannel, ForumCategory, ForumThread, ForumPost, Announcement,
     Podcast, Subscription, EmailVerificationToken,
+    SubscriptionProduct, Coupon, Transaction,
+    BILLING_MONTHLY, BILLING_ANNUAL, _money,
 )
 from .youtube import get_latest_videos
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, F
+from django.db import transaction as db_transaction
+from datetime import timedelta
 
 
 def _is_admin(user):
@@ -747,3 +751,128 @@ def announcement_delete(request, pk):
     get_object_or_404(Announcement, pk=pk).delete()
     messages.success(request, 'Announcement deleted.')
     return redirect('announcement_admin')
+
+
+# --- Subscription checkout ---------------------------------------------------
+
+def _interval_label(interval):
+    return 'year' if interval == BILLING_ANNUAL else 'month'
+
+
+def _price_quote(product, interval, code):
+    """Compute a checkout quote. Returns a dict with base/discount/final and an
+    optional coupon error message for invalid codes."""
+    base = product.price_for(interval)
+    coupon = None
+    discount = 0
+    error = ''
+    code = (code or '').strip()
+    if code:
+        coupon = Coupon.find(code)
+        if coupon is None:
+            error = 'That code is not valid.'
+        elif not coupon.is_redeemable_now():
+            error = 'That code has expired or is no longer available.'
+            coupon = None
+        elif not coupon.applies_to(product):
+            error = 'That code does not apply to this product.'
+            coupon = None
+        else:
+            discount = coupon.percent_off
+    final = _money(base * (100 - discount) / 100)
+    return {
+        'product': product,
+        'interval': interval,
+        'interval_label': _interval_label(interval),
+        'base': base,
+        'coupon': coupon,
+        'code': code,
+        'discount': discount,
+        'discount_amount': _money(base - final),
+        'final': final,
+        'is_free': final <= 0,
+        'error': error,
+    }
+
+
+@login_required
+def subscribe_index(request):
+    products = SubscriptionProduct.objects.filter(is_active=True).select_related('podcast')
+    owned = set(request.user.active_subscriptions().values_list('podcast_id', flat=True))
+    for p in products:
+        p.already_active = p.podcast_id in owned
+    return render(request, 'home/subscribe/index.html', {'products': products})
+
+
+@login_required
+def checkout(request, product_id):
+    product = get_object_or_404(SubscriptionProduct, pk=product_id, is_active=True)
+    interval = request.POST.get('interval') or request.GET.get('interval') or BILLING_MONTHLY
+    if interval not in (BILLING_MONTHLY, BILLING_ANNUAL):
+        interval = BILLING_MONTHLY
+    code = request.POST.get('coupon_code', '')
+    action = request.POST.get('action', '')
+
+    quote = _price_quote(product, interval, code)
+
+    if request.method == 'POST' and action == 'complete':
+        if not quote['is_free']:
+            messages.error(
+                request,
+                'Online payment is not available yet. A coupon covering the full '
+                'price is required to complete checkout.',
+            )
+        else:
+            txn = _complete_checkout(request.user, quote)
+            return redirect('checkout_success', pk=txn.pk)
+
+    if quote['error']:
+        messages.error(request, quote['error'])
+
+    return render(request, 'home/subscribe/checkout.html', {'q': quote})
+
+
+def _complete_checkout(user, quote):
+    """Record a completed (free) transaction and grant/extend the subscription."""
+    product = quote['product']
+    interval = quote['interval']
+    now = timezone.now()
+    span = timedelta(days=365) if interval == BILLING_ANNUAL else timedelta(days=30)
+
+    with db_transaction.atomic():
+        coupon = quote['coupon']
+        if coupon is not None:
+            Coupon.objects.filter(pk=coupon.pk).update(times_used=F('times_used') + 1)
+
+        existing = Subscription.objects.filter(user=user, podcast=product.podcast).first()
+        anchor = now
+        if existing and existing.expires_at and existing.expires_at > now:
+            anchor = existing.expires_at
+        new_expiry = anchor + span
+
+        Subscription.objects.update_or_create(
+            user=user, podcast=product.podcast,
+            defaults={'is_active': True, 'expires_at': new_expiry},
+        )
+
+        txn = Transaction.objects.create(
+            user=user,
+            product=product,
+            product_name=product.name,
+            billing_interval=interval,
+            base_price=quote['base'],
+            coupon=coupon,
+            coupon_code=quote['code'],
+            discount_percent=quote['discount'],
+            final_price=quote['final'],
+            status=Transaction.STATUS_COMPLETED,
+            granted_until=new_expiry,
+            completed_at=now,
+        )
+    return txn
+
+
+@login_required
+def checkout_success(request, pk):
+    txn = get_object_or_404(Transaction, pk=pk, user=request.user)
+    return render(request, 'home/subscribe/success.html', {'txn': txn})

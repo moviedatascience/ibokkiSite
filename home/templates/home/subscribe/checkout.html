@@ -1,0 +1,64 @@
+{% extends "home/base.html" %}
+{% block main_classes %}w-full overflow-y-auto{% endblock %}
+{% block content %}
+<div class="container mx-auto px-4 py-8 pt-[4.5rem] max-w-lg space-y-4">
+
+    <a href="{% url 'subscribe' %}" class="text-xs text-youtube-secondary hover:text-youtube-primary">&larr; All subscriptions</a>
+    <h1 class="text-2xl font-bold text-youtube-primary">Checkout</h1>
+
+    {% if messages %}{% for m in messages %}<p class="text-sm text-red-400">{{ m }}</p>{% endfor %}{% endif %}
+
+    <div class="rounded-lg border border-youtube bg-youtube-primary p-5 space-y-4">
+        <div>
+            <h2 class="text-lg font-semibold text-youtube-primary">{{ q.product.name }}</h2>
+            {% if q.product.description %}<p class="text-sm text-youtube-secondary mt-1">{{ q.product.description }}</p>{% endif %}
+        </div>
+
+        <form method="post" action="{% url 'checkout' q.product.id %}" class="space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label class="block text-xs uppercase tracking-wide text-youtube-secondary mb-1">Billing</label>
+                <select name="interval" class="w-full bg-youtube-nav border border-youtube rounded-lg px-3 py-2 text-youtube-primary text-sm">
+                    <option value="monthly" {% if q.interval == 'monthly' %}selected{% endif %}>Monthly &mdash; ${{ q.product.monthly_price }}/month</option>
+                    <option value="annual" {% if q.interval == 'annual' %}selected{% endif %}>Annual &mdash; ${{ q.product.annual_price }}/year</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs uppercase tracking-wide text-youtube-secondary mb-1">Coupon code</label>
+                <div class="flex gap-2">
+                    <input type="text" name="coupon_code" value="{{ q.code }}" placeholder="Enter code"
+                           class="flex-1 bg-youtube-nav border border-youtube rounded-lg px-3 py-2 text-youtube-primary text-sm uppercase">
+                    <button type="submit" name="action" value="apply"
+                            class="bg-youtube-secondary text-youtube-primary px-4 py-2 rounded-lg hover:opacity-80 text-sm">Apply</button>
+                </div>
+            </div>
+
+            <div class="border-t border-youtube pt-3 space-y-1 text-sm">
+                <div class="flex justify-between text-youtube-secondary">
+                    <span>Price ({{ q.interval_label }})</span><span>${{ q.base }}</span>
+                </div>
+                {% if q.discount %}
+                <div class="flex justify-between text-green-400">
+                    <span>Coupon {{ q.code }} (&minus;{{ q.discount }}%)</span><span>&minus;${{ q.discount_amount }}</span>
+                </div>
+                {% endif %}
+                <div class="flex justify-between text-youtube-primary font-bold text-base pt-1">
+                    <span>Total</span><span>${{ q.final }}</span>
+                </div>
+            </div>
+
+            {% if q.is_free %}
+            <button type="submit" name="action" value="complete"
+                    class="w-full bg-[#ff0000] text-youtube-primary px-4 py-3 rounded-lg hover:bg-[#cc0000] font-semibold">Complete &mdash; Free</button>
+            {% else %}
+            <button type="button" disabled
+                    class="w-full bg-youtube-secondary text-youtube-secondary px-4 py-3 rounded-lg font-semibold opacity-60 cursor-not-allowed">Payment not available yet</button>
+            <p class="text-xs text-youtube-secondary text-center">Online payments aren't enabled yet. A coupon that brings the total to $0.00 is required to complete checkout.</p>
+            {% endif %}
+        </form>
+    </div>
+
+</div>
+{% endblock %}
