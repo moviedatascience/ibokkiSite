@@ -12,12 +12,20 @@
         {% if categories %}
         <ul class="divide-y divide-[#272727]">
             {% for c in categories %}
-            <li class="px-4 py-3 hover:bg-youtube-secondary transition-colors">
+            <li class="px-4 py-3 {% if c.accessible %}hover:bg-youtube-secondary{% endif %} transition-colors">
+                {% if c.accessible %}
                 <a href="{% url 'forum_category' c.slug %}" class="block">
                     <span class="text-youtube-primary font-medium">{{ c.name }}</span>
                     <span class="text-xs text-youtube-secondary ml-2">{{ c.threads.count }} thread{{ c.threads.count|pluralize }}</span>
                     {% if c.description %}<p class="text-xs text-youtube-secondary mt-0.5">{{ c.description }}</p>{% endif %}
                 </a>
+                {% else %}
+                <div class="block opacity-70">
+                    <span class="text-youtube-primary font-medium">&#128274; {{ c.name }}</span>
+                    <span class="text-xs text-red-400 ml-2">Requires {{ c.required_podcast.name }} subscription</span>
+                    {% if c.description %}<p class="text-xs text-youtube-secondary mt-0.5">{{ c.description }}</p>{% endif %}
+                </div>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>

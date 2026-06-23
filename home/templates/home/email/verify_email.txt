@@ -1,0 +1,9 @@
+Hi {{ username }},
+
+Welcome to Ibokki! Please verify your email address to activate your account:
+
+{{ verify_url }}
+
+This link expires in {{ expiry_hours }} hours.
+
+If you didn't create this account, you can safely ignore this email.

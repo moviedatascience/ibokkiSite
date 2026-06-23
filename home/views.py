@@ -12,11 +12,13 @@ from django.template.loader import render_to_string
 from .models import (
     StreamSettings, Invitation, PasswordResetToken, Emote, EmoteFavorite,
     TrackedChannel, ForumCategory, ForumThread, ForumPost, Announcement,
+    Podcast, Subscription, EmailVerificationToken,
 )
 from .youtube import get_latest_videos
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 from django.utils import timezone
+from django.db.models import Q
 
 
 def _is_admin(user):
@@ -24,6 +26,16 @@ def _is_admin(user):
     return user.is_authenticated and (
         getattr(user, 'role', None) == 'admin' or user.is_staff or user.is_superuser
     )
+
+
+def _category_access_q(user, field='required_podcast'):
+    """Q over a Podcast FK (`field`) selecting rows the user may access:
+    ungated rows, plus rows whose podcast the user actively subscribes to.
+    Site admins get everything."""
+    if user.is_site_admin:
+        return Q()
+    ids = list(user.active_subscriptions().values_list('podcast_id', flat=True))
+    return Q(**{f'{field}__isnull': True}) | Q(**{f'{field}__id__in': ids})
 from django.contrib import messages
 from django.http import JsonResponse
 import logging
@@ -85,7 +97,13 @@ def login_view(request):
             next_url = request.GET.get('next', '/home/')
             return redirect(next_url)
         else:
-            messages.error(request, 'Invalid username or password.')
+            # If the credentials are correct but the account is unverified,
+            # nudge the user to verify rather than showing "invalid".
+            pending = User.objects.filter(username=username, is_active=False).first()
+            if pending and pending.check_password(password):
+                messages.error(request, 'Please verify your email before logging in -- check your inbox for the verification link.')
+            else:
+                messages.error(request, 'Invalid username or password.')
 
     return render(request, 'home/login.html')
 
@@ -93,8 +111,84 @@ def login_view(request):
 # ---------------------------------------------------------------------------
 # Registration View (invite-based)
 # ---------------------------------------------------------------------------
-def register_view(request, token):
-    """Registration page -- accessed via an invitation link."""
+def _send_verification_email(user):
+    """Email a one-time verification link to a freshly-registered (inactive) user."""
+    _, raw_token = EmailVerificationToken.create_token(user)
+    verify_url = f"{settings.BASE_URL}/verify-email/{raw_token}/"
+    body = render_to_string('home/email/verify_email.txt', {
+        'username': user.display_name or user.username,
+        'verify_url': verify_url,
+        'expiry_hours': 48,
+    })
+    try:
+        send_mail('Verify your Ibokki account', body, settings.DEFAULT_FROM_EMAIL,
+                  [user.email], fail_silently=False)
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {user.email}: {e}")
+
+
+def register_view(request):
+    """Open registration. Creates an inactive account and emails a verification link.
+
+    Access to the site is now open; gated podcast areas require a subscription.
+    """
+    if request.user.is_authenticated:
+        return redirect('landing')
+
+    if request.method == 'POST':
+        username = request.POST.get('username', '').strip()
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '')
+        password_confirm = request.POST.get('password_confirm', '')
+
+        errors = []
+        if not username:
+            errors.append('Username is required.')
+        elif User.objects.filter(username=username).exists():
+            errors.append('That username is already taken.')
+        if not email:
+            errors.append('Email is required.')
+        elif User.objects.filter(email=email).exists():
+            errors.append('An account with that email already exists.')
+        if password != password_confirm:
+            errors.append('Passwords do not match.')
+        if not errors:
+            try:
+                validate_password(password)
+            except ValidationError as e:
+                errors.extend(e.messages)
+
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+            return render(request, 'home/register.html', {'username': username, 'email': email})
+
+        user = User.objects.create_user(username=username, email=email, password=password)
+        user.is_active = False  # stays inactive until the email is verified
+        user.save()
+        _send_verification_email(user)
+        messages.success(request, 'Account created! Check your email for a link to verify and activate your account.')
+        return redirect('login')
+
+    return render(request, 'home/register.html')
+
+
+def verify_email_view(request, token):
+    """Activate an account from the emailed verification link."""
+    token_obj = EmailVerificationToken.validate_token(token)
+    if not token_obj:
+        return render(request, 'home/verify_email.html', {'invalid': True})
+    user = token_obj.user
+    user.is_active = True
+    user.save(update_fields=['is_active'])
+    token_obj.used = True
+    token_obj.save(update_fields=['used'])
+    messages.success(request, 'Email verified! You can now log in.')
+    return redirect('login')
+
+
+def register_invite_view(request, token):
+    """Registration page -- accessed via an invitation link (still supported)."""
     if request.user.is_authenticated:
         return redirect('landing')
 
@@ -360,6 +454,7 @@ def landing_page(request):
     latest_posts = (
         ForumPost.objects
         .select_related('thread', 'thread__category', 'author')
+        .filter(_category_access_q(request.user, 'thread__category__required_podcast'))
         .order_by('-created_at')[:6]
     )
 
@@ -499,9 +594,13 @@ def switch_stream(request):
 # ---------------------------------------------------------------------------
 @login_required
 def forum_index(request):
-    categories = ForumCategory.objects.all()
+    categories = list(ForumCategory.objects.select_related('required_podcast').all())
+    # Mark which sections the user can enter (locked ones still show, as a teaser).
+    for c in categories:
+        c.accessible = request.user.has_podcast_access(c.required_podcast)
     recent_threads = (
         ForumThread.objects.select_related('category', 'author')
+        .filter(_category_access_q(request.user, 'category__required_podcast'))
         .order_by('-last_activity')[:15]
     )
     return render(request, 'home/forum/index.html', {
@@ -513,6 +612,9 @@ def forum_index(request):
 @login_required
 def forum_category(request, slug):
     category = get_object_or_404(ForumCategory, slug=slug)
+    if not request.user.has_podcast_access(category.required_podcast):
+        messages.error(request, f'That section requires a {category.required_podcast.name} subscription.')
+        return redirect('forum_index')
     threads = category.threads.select_related('author').all()
     return render(request, 'home/forum/category.html', {
         'category': category,
@@ -523,8 +625,11 @@ def forum_category(request, slug):
 @login_required
 def forum_thread(request, pk):
     thread = get_object_or_404(
-        ForumThread.objects.select_related('category', 'author'), pk=pk
+        ForumThread.objects.select_related('category', 'author', 'category__required_podcast'), pk=pk
     )
+    if not request.user.has_podcast_access(thread.category.required_podcast):
+        messages.error(request, f'That section requires a {thread.category.required_podcast.name} subscription.')
+        return redirect('forum_index')
     posts = thread.posts.select_related('author').all()
     return render(request, 'home/forum/thread.html', {
         'thread': thread,
@@ -535,6 +640,9 @@ def forum_thread(request, pk):
 @login_required
 def forum_new_thread(request, slug):
     category = get_object_or_404(ForumCategory, slug=slug)
+    if not request.user.has_podcast_access(category.required_podcast):
+        messages.error(request, f'That section requires a {category.required_podcast.name} subscription.')
+        return redirect('forum_index')
     if request.method == 'POST':
         title = (request.POST.get('title') or '').strip()
         content = (request.POST.get('content') or '').strip()
@@ -553,7 +661,10 @@ def forum_new_thread(request, slug):
 @login_required
 @require_POST
 def forum_reply(request, pk):
-    thread = get_object_or_404(ForumThread, pk=pk)
+    thread = get_object_or_404(ForumThread.objects.select_related('category', 'category__required_podcast'), pk=pk)
+    if not request.user.has_podcast_access(thread.category.required_podcast):
+        messages.error(request, 'You do not have access to that section.')
+        return redirect('forum_index')
     if thread.is_locked and not _is_admin(request.user):
         messages.error(request, 'This thread is locked.')
         return redirect('forum_thread', pk=thread.pk)

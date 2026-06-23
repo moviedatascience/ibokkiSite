@@ -6,7 +6,31 @@ from .models import (
     CustomUser, StreamSettings, ChatMessage, Emote, Invitation,
     PasswordResetToken, UserTimeout, UserBan, Poll, PollOption, PollVote,
     TrackedChannel, ForumCategory, ForumThread, ForumPost, Announcement,
+    Podcast, Subscription, EmailVerificationToken,
 )
+
+
+class SubscriptionInline(admin.TabularInline):
+    model = Subscription
+    extra = 0
+    autocomplete_fields = ('podcast',)
+    fields = ('podcast', 'is_active', 'started_at', 'expires_at')
+
+
+@admin.register(Podcast)
+class PodcastAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active')
+    list_editable = ('is_active',)
+    prepopulated_fields = {'slug': ('name',)}
+    search_fields = ('name', 'slug')
+
+
+@admin.register(Subscription)
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('user', 'podcast', 'is_active', 'started_at', 'expires_at')
+    list_filter = ('podcast', 'is_active')
+    search_fields = ('user__username', 'user__email', 'podcast__name')
+    autocomplete_fields = ('user', 'podcast')
 
 
 @admin.register(TrackedChannel)
@@ -49,6 +73,7 @@ class CustomUserAdmin(UserAdmin):
     list_display = ('username', 'display_name', 'email', 'role', 'invites_remaining', 'is_staff', 'is_active')
     list_filter = ('role', 'is_staff', 'is_superuser', 'is_active')
     search_fields = ('username', 'display_name', 'email')
+    inlines = [SubscriptionInline]
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal info', {'fields': ('display_name', 'first_name', 'last_name', 'email')}),

@@ -7,7 +7,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from .models import ChatMessage, Emote, UserTimeout, UserBan, Poll, PollOption, PollVote
+from .models import ChatMessage, Emote, UserTimeout, UserBan, Poll, PollOption, PollVote, StreamSettings
 from django.utils.html import escape
 from django.utils import timezone
 from django.db import transaction
@@ -182,6 +182,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             }))
             return
 
+        # Subscription gate: a stream restricted to a podcast only accepts
+        # messages from active subscribers (admins/mods bypass via has_podcast_access).
+        if not await self._can_chat_in_stream(user, self.viewing_stream):
+            await self.send(text_data=json.dumps({
+                'type': 'error',
+                'error': 'This chat is for subscribers of this show.'
+            }))
+            return
+
         # Rate limiting
         current_time = time.time()
         last_message_time = getattr(self, 'last_message_time', 0)
@@ -227,6 +236,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'viewing_stream': self.viewing_stream,
             }
         )
+
+    @database_sync_to_async
+    def _can_chat_in_stream(self, user, viewing_stream):
+        """A stream gated by required_podcast only lets active subscribers post.
+        viewing_stream is 'platform_channelslug'; ungated/unknown streams allow all."""
+        if not user or not user.is_authenticated:
+            return False
+        parts = (viewing_stream or '').split('_', 1)
+        if len(parts) == 2:
+            platform, slug = parts
+            stream = StreamSettings.objects.select_related('required_podcast').filter(
+                platform=platform, channel_slug=slug
+            ).first()
+            if stream and stream.required_podcast_id:
+                return user.has_podcast_access(stream.required_podcast)
+        return True
 
     async def handle_command(self, command):
         if not self.scope["user"].is_authenticated:

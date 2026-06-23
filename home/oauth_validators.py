@@ -16,6 +16,9 @@ class IbokkiOAuth2Validator(OAuth2Validator):
         "preferred_username": "profile",
         "name": "profile",
         "role": "roles",
+        # Active podcast subscriptions, exposed so Fluxer can gate communities
+        # by entitlement once it supports claim-based access.
+        "entitlements": "profile",
     }
 
     def get_additional_claims(self, request):
@@ -27,4 +30,5 @@ class IbokkiOAuth2Validator(OAuth2Validator):
             "preferred_username": display,
             "name": display,
             "role": user.role,
+            "entitlements": user.active_podcast_slugs(),
         }

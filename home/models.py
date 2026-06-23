@@ -44,6 +44,31 @@ class CustomUser(AbstractUser):
             return True
         return self.invites_remaining > 0
 
+    @property
+    def is_site_admin(self):
+        """Admins/staff/superusers bypass subscription gates."""
+        return self.is_superuser or self.is_staff or self.role == 'admin'
+
+    def active_subscriptions(self):
+        """Subscription rows that are currently active (not expired)."""
+        now = timezone.now()
+        return self.subscriptions.filter(
+            is_active=True, podcast__is_active=True,
+        ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+
+    def active_podcast_slugs(self):
+        """Slugs of podcasts the user currently has access to (for OIDC claims)."""
+        return sorted(self.active_subscriptions().values_list('podcast__slug', flat=True))
+
+    def has_podcast_access(self, podcast):
+        """True if access to `podcast` is allowed. None = ungated/public.
+        Site admins always have access."""
+        if podcast is None:
+            return True
+        if self.is_site_admin:
+            return True
+        return self.active_subscriptions().filter(podcast=podcast).exists()
+
 
 class Invitation(models.Model):
     email = models.EmailField()
@@ -179,6 +204,10 @@ class StreamSettings(models.Model):
     )
     is_featured = models.BooleanField(default=False)
     is_active = models.BooleanField(default=False)
+    required_podcast = models.ForeignKey(
+        'Podcast', null=True, blank=True, on_delete=models.SET_NULL, related_name='streams',
+        help_text="If set, only active subscribers to this podcast can use this stream's live chat. Blank = open.",
+    )
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
@@ -556,6 +585,10 @@ class ForumCategory(models.Model):
     slug = models.SlugField(unique=True)
     description = models.CharField(max_length=255, blank=True, default='')
     order = models.PositiveIntegerField(default=0, help_text="Lower numbers show first")
+    required_podcast = models.ForeignKey(
+        'Podcast', null=True, blank=True, on_delete=models.SET_NULL, related_name='forum_categories',
+        help_text="If set, only active subscribers to this podcast can view/post here. Blank = public.",
+    )
 
     class Meta:
         ordering = ['order', 'name']
@@ -638,3 +671,87 @@ class Announcement(models.Model):
 
     def __str__(self):
         return self.title
+
+
+# ---------------------------------------------------------------------------
+# Subscriptions / "user classes" (podcast tiers that gate access)
+# ---------------------------------------------------------------------------
+class Podcast(models.Model):
+    """A subscription tier (the 'user class'). Used to gate forum sections,
+    Fluxer communities, and live chat."""
+    name = models.CharField(max_length=120, unique=True)
+    slug = models.SlugField(unique=True, help_text="Stable id used in access checks and OIDC claims")
+    description = models.TextField(blank=True, default='')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class Subscription(models.Model):
+    """A user's membership in a Podcast tier. Granted manually for now
+    (no payment flow yet); an active row unlocks that podcast's gated content."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='subscriptions'
+    )
+    podcast = models.ForeignKey(Podcast, on_delete=models.CASCADE, related_name='subscriptions')
+    is_active = models.BooleanField(default=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField(null=True, blank=True, help_text="Leave blank for no expiry")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'podcast'], name='unique_user_podcast_subscription'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} -> {self.podcast.name}"
+
+
+class EmailVerificationToken(models.Model):
+    """One-time token emailed on registration to verify ownership of an email."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='email_verification_tokens'
+    )
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        indexes = [models.Index(fields=['token_hash'])]
+
+    @property
+    def is_valid(self):
+        return not self.used and timezone.now() <= self.expires_at
+
+    @staticmethod
+    def hash_token(token):
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    @classmethod
+    def create_token(cls, user, expiry_hours=48):
+        cls.objects.filter(user=user, used=False).update(used=True)
+        raw_token = secrets.token_urlsafe(48)
+        obj = cls.objects.create(
+            user=user,
+            token_hash=cls.hash_token(raw_token),
+            expires_at=timezone.now() + timedelta(hours=expiry_hours),
+        )
+        return obj, raw_token
+
+    @classmethod
+    def validate_token(cls, raw_token):
+        try:
+            obj = cls.objects.get(token_hash=cls.hash_token(raw_token))
+            return obj if obj.is_valid else None
+        except cls.DoesNotExist:
+            return None
