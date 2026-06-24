@@ -9,28 +9,47 @@
             <h1 class="text-2xl font-bold text-youtube-primary">{{ category.name }}</h1>
             {% if category.description %}<p class="text-sm text-youtube-secondary">{{ category.description }}</p>{% endif %}
         </div>
+        {% if accessible %}
         <a href="{% url 'forum_new_thread' category.slug %}" class="bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] text-sm whitespace-nowrap">+ New Thread</a>
+        {% endif %}
     </div>
+
+    {% if not accessible %}
+    <div class="rounded-lg border border-red-700 bg-youtube-primary p-4 text-center space-y-2">
+        <p class="text-youtube-primary">&#128274; This section requires a <span class="font-semibold">{{ category.required_podcast.name }}</span> subscription.</p>
+        <a href="{% url 'subscribe' %}" class="inline-block bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] text-sm font-semibold">View subscriptions</a>
+    </div>
+    {% endif %}
 
     <section class="rounded-lg overflow-hidden border border-youtube bg-youtube-primary">
         {% if threads %}
         <ul class="divide-y divide-[#272727]">
             {% for t in threads %}
-            <li class="flex items-center justify-between px-4 py-3 hover:bg-youtube-secondary transition-colors">
+            <li class="flex items-center justify-between px-4 py-3 {% if accessible %}hover:bg-youtube-secondary transition-colors{% endif %}">
+                {% if accessible %}
                 <a href="{% url 'forum_thread' t.pk %}" class="min-w-0">
                     <span class="text-youtube-primary hover:underline truncate block">
-                        {% if t.is_pinned %}<span class="text-red-500">[pinned]</span> {% endif %}{% if t.is_locked %}🔒 {% endif %}{{ t.title }}
+                        {% if t.is_pinned %}<span class="text-red-500">[pinned]</span> {% endif %}{% if t.is_locked %}&#128274; {% endif %}{{ t.title }}
                     </span>
                     <span class="text-xs text-youtube-secondary">by {{ t.author.display_name|default:t.author.username }}</span>
                 </a>
                 <span class="text-xs text-youtube-secondary whitespace-nowrap ml-3">
                     {{ t.reply_count }} repl{{ t.reply_count|pluralize:"y,ies" }} &middot; {{ t.last_activity|timesince }} ago
                 </span>
+                {% else %}
+                <div class="min-w-0 blur-sm select-none pointer-events-none">
+                    <span class="text-youtube-primary truncate block">{{ t.title }}</span>
+                    <span class="text-xs text-youtube-secondary">by {{ t.author.display_name|default:t.author.username }}</span>
+                </div>
+                <span class="text-xs text-youtube-secondary whitespace-nowrap ml-3 blur-sm select-none pointer-events-none">
+                    {{ t.reply_count }} repl{{ t.reply_count|pluralize:"y,ies" }}
+                </span>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p class="text-sm text-youtube-secondary p-6 text-center">No threads here yet. Be the first to post.</p>
+        <p class="text-sm text-youtube-secondary p-6 text-center">No threads here yet.{% if accessible %} Be the first to post.{% endif %}</p>
         {% endif %}
     </section>
 

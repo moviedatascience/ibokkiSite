@@ -182,8 +182,8 @@ BASE_URL = BASE_URL.rstrip('/')
 TWITCH_PARENT_DOMAIN = os.getenv('TWITCH_PARENT_DOMAIN', 'localhost' if ENVIRONMENT == 'local' else 'ibokki.com')
 
 # Auth settings
-LOGIN_URL = "/"
-LOGIN_REDIRECT_URL = "/home/"
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/"
 
 # ---------------------------------------------------------------------------
 # OpenID Connect provider (django-oauth-toolkit)

@@ -35,11 +35,23 @@ def _is_admin(user):
 def _category_access_q(user, field='required_podcast'):
     """Q over a Podcast FK (`field`) selecting rows the user may access:
     ungated rows, plus rows whose podcast the user actively subscribes to.
-    Site admins get everything."""
-    if user.is_site_admin:
+    Site admins get everything; anonymous users get only ungated rows."""
+    if user.is_authenticated and user.is_site_admin:
         return Q()
+    if not user.is_authenticated:
+        return Q(**{f'{field}__isnull': True})
     ids = list(user.active_subscriptions().values_list('podcast_id', flat=True))
     return Q(**{f'{field}__isnull': True}) | Q(**{f'{field}__id__in': ids})
+
+
+def _has_podcast_access(user, podcast):
+    """Per-object access check that is safe for anonymous users.
+    Ungated content (podcast is None) is open to everyone."""
+    if podcast is None:
+        return True
+    if not user.is_authenticated:
+        return False
+    return user.has_podcast_access(podcast)
 from django.contrib import messages
 from django.http import JsonResponse
 import logging
@@ -98,7 +110,7 @@ def login_view(request):
             login(request, user)
             if not remember_me:
                 request.session.set_expiry(0)  # Session expires when browser closes
-            next_url = request.GET.get('next', '/home/')
+            next_url = request.GET.get('next', '/')
             return redirect(next_url)
         else:
             # If the credentials are correct but the account is unverified,
@@ -442,9 +454,8 @@ def reset_password_view(request, token):
 # ---------------------------------------------------------------------------
 # Landing Page (requires login now)
 # ---------------------------------------------------------------------------
-@login_required
 def landing_page(request):
-    """Landing page view -- shown after login."""
+    """Home page -- public. Gated forum posts are filtered out for visitors."""
     featured_stream = StreamSettings.objects.filter(is_featured=True, is_active=True).first()
 
     if not featured_stream:
@@ -472,9 +483,8 @@ def landing_page(request):
     return render(request, 'home/landing.html', context)
 
 
-@login_required
 def all_videos(request):
-    """Full listing of the latest videos across all tracked channels."""
+    """Full listing of the latest videos across all tracked channels. Public."""
     return render(request, 'home/videos.html', {
         'videos': get_latest_videos(limit=None),
     })
@@ -507,7 +517,6 @@ def profile_view(request):
 # ---------------------------------------------------------------------------
 # Watch View
 # ---------------------------------------------------------------------------
-@login_required
 @ensure_csrf_cookie
 def watch(request):
     featured_stream = StreamSettings.objects.filter(is_featured=True, is_active=True).first()
@@ -596,44 +605,46 @@ def switch_stream(request):
 # ---------------------------------------------------------------------------
 # Forum (minimal)
 # ---------------------------------------------------------------------------
-@login_required
 def forum_index(request):
     categories = list(ForumCategory.objects.select_related('required_podcast').all())
     # Mark which sections the user can enter (locked ones still show, as a teaser).
     for c in categories:
-        c.accessible = request.user.has_podcast_access(c.required_podcast)
-    recent_threads = (
-        ForumThread.objects.select_related('category', 'author')
-        .filter(_category_access_q(request.user, 'category__required_podcast'))
+        c.accessible = _has_podcast_access(request.user, c.required_podcast)
+    # Show all recent threads; gated ones are blurred in the template until the
+    # viewer has an active subscription.
+    recent_threads = list(
+        ForumThread.objects.select_related('category', 'author', 'category__required_podcast')
         .order_by('-last_activity')[:15]
     )
+    for t in recent_threads:
+        t.accessible = _has_podcast_access(request.user, t.category.required_podcast)
     return render(request, 'home/forum/index.html', {
         'categories': categories,
         'recent_threads': recent_threads,
     })
 
 
-@login_required
 def forum_category(request, slug):
-    category = get_object_or_404(ForumCategory, slug=slug)
-    if not request.user.has_podcast_access(category.required_podcast):
-        messages.error(request, f'That section requires a {category.required_podcast.name} subscription.')
-        return redirect('forum_index')
+    category = get_object_or_404(
+        ForumCategory.objects.select_related('required_podcast'), slug=slug
+    )
+    accessible = _has_podcast_access(request.user, category.required_podcast)
     threads = category.threads.select_related('author').all()
     return render(request, 'home/forum/category.html', {
         'category': category,
         'threads': threads,
+        'accessible': accessible,
     })
 
 
-@login_required
 def forum_thread(request, pk):
     thread = get_object_or_404(
         ForumThread.objects.select_related('category', 'author', 'category__required_podcast'), pk=pk
     )
-    if not request.user.has_podcast_access(thread.category.required_podcast):
+    # Reading a gated thread's contents requires an active subscription.
+    if not _has_podcast_access(request.user, thread.category.required_podcast):
         messages.error(request, f'That section requires a {thread.category.required_podcast.name} subscription.')
-        return redirect('forum_index')
+        return redirect('forum_category', slug=thread.category.slug)
     posts = thread.posts.select_related('author').all()
     return render(request, 'home/forum/thread.html', {
         'thread': thread,
@@ -685,7 +696,6 @@ def forum_reply(request, pk):
 # ---------------------------------------------------------------------------
 # Announcements (public list/detail + admin management)
 # ---------------------------------------------------------------------------
-@login_required
 def announcement_list(request):
     announcements = Announcement.objects.filter(is_published=True)
     return render(request, 'home/announcements/list.html', {
@@ -693,7 +703,6 @@ def announcement_list(request):
     })
 
 
-@login_required
 def announcement_detail(request, pk):
     announcement = get_object_or_404(Announcement, pk=pk)
     if not announcement.is_published and not _is_admin(request.user):

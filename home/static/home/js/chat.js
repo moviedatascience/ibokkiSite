@@ -321,6 +321,8 @@ class ChatUI {
         this.options = {
             maxMessages: 100,
             isMod: false,
+            requireAuth: false,      // when true, sending is gated behind sign-in
+            onRequireAuth: null,     // callback invoked instead of sending
             ...options
         };
 
@@ -437,6 +439,7 @@ class ChatUI {
         if (this.inputForm) {
             this.inputForm.addEventListener('submit', (e) => {
                 e.preventDefault();
+                if (this._requireAuth()) return;
                 this._submitMessage();
             });
         }
@@ -444,11 +447,26 @@ class ChatUI {
             // Enter sends, Shift+Enter inserts a newline (destiny-style; no Send button).
             this.inputField.addEventListener('keydown', (e) => this._onInputKeydown(e));
             this.inputField.addEventListener('input', () => this._autoResizeInput());
+            if (this.options.requireAuth) {
+                // Visitors can read chat but must sign in to interact.
+                this.inputField.addEventListener('focus', () => this._requireAuth());
+            }
         }
+    }
+
+    _requireAuth() {
+        // Returns true (and prompts) when the viewer is not signed in.
+        if (!this.options.requireAuth) return false;
+        if (this.inputField) this.inputField.blur();
+        if (typeof this.options.onRequireAuth === 'function') {
+            this.options.onRequireAuth();
+        }
+        return true;
     }
 
     _onInputKeydown(e) {
         if (e.key !== 'Enter' || e.shiftKey) return;
+        if (this._requireAuth()) { e.preventDefault(); return; }
         // When the slash-command or emote popup is open, let its own handler
         // claim Enter (to complete a command/emote) instead of sending.
         const slashOpen = this.slashPopup && !this.slashPopup.classList.contains('hidden');

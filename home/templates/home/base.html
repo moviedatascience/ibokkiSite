@@ -96,6 +96,11 @@
                         </form>
                     </div>
                 </div>
+            {% else %}
+                <div class="flex items-center gap-2">
+                    <a href="{% url 'login' %}" class="px-3 py-1.5 rounded text-sm text-youtube-secondary hover:text-youtube-primary hover:bg-youtube-secondary transition-colors">Log in</a>
+                    <a href="{% url 'register' %}" class="px-3 py-1.5 rounded text-sm font-semibold bg-[#ff0000] text-youtube-primary hover:bg-[#cc0000] transition-colors">Sign up</a>
+                </div>
             {% endif %}
         </div>
     </nav>

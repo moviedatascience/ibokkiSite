@@ -44,6 +44,21 @@
         {% include "home/chat_panel.html" %}
     </div>
 </div>
+
+{% if not user.is_authenticated %}
+<!-- Account prompt shown when a visitor tries to chat -->
+<div id="chat-auth-modal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4">
+    <div class="bg-youtube-nav border border-youtube rounded-lg shadow-xl max-w-sm w-full p-6 text-center space-y-4">
+        <h3 class="text-lg font-bold text-youtube-primary">Join the conversation</h3>
+        <p class="text-sm text-youtube-secondary">Create a free account to chat during the live show.</p>
+        <div class="flex gap-2">
+            <a href="{% url 'register' %}" class="flex-1 text-center bg-[#ff0000] text-youtube-primary px-4 py-2 rounded-lg hover:bg-[#cc0000] text-sm font-semibold">Sign up</a>
+            <a href="{% url 'login' %}" class="flex-1 text-center bg-youtube-secondary text-youtube-primary px-4 py-2 rounded-lg hover:opacity-80 text-sm font-semibold">Log in</a>
+        </div>
+        <button type="button" id="chat-auth-close" class="text-xs text-youtube-secondary hover:text-youtube-primary">Maybe later</button>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -148,6 +163,20 @@
     const iframe = document.querySelector('iframe');
     let currentStreamKey = {% if current_stream %}'{{ current_stream.platform }}/{{ current_stream.channel_slug }}'{% else %}''{% endif %};
     const userIsMod = {{ user.is_moderator_or_above|yesno:"true,false" }};
+    const isAuthenticated = {% if user.is_authenticated %}true{% else %}false{% endif %};
+
+    // Account prompt for visitors who try to chat
+    const authModal = document.getElementById('chat-auth-modal');
+    function showAuthPrompt() {
+        if (authModal) authModal.classList.remove('hidden');
+    }
+    if (authModal) {
+        authModal.addEventListener('click', (e) => {
+            if (e.target === authModal) authModal.classList.add('hidden');
+        });
+        const authCloseBtn = document.getElementById('chat-auth-close');
+        if (authCloseBtn) authCloseBtn.addEventListener('click', () => authModal.classList.add('hidden'));
+    }
 
     selectEls.forEach(select => {
         select.addEventListener('change', function() {
@@ -185,7 +214,9 @@
 
         chatUI = new ChatUI(chatClient, {
             maxMessages: 100,
-            isMod: userIsMod
+            isMod: userIsMod,
+            requireAuth: !isAuthenticated,
+            onRequireAuth: showAuthPrompt
         });
 
         if (chatUI.init('#chat-messages', '#chat-form', '#chat-input')) {

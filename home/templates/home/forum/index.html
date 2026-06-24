@@ -41,7 +41,8 @@
         {% if recent_threads %}
         <ul class="divide-y divide-[#272727]">
             {% for t in recent_threads %}
-            <li class="flex items-center justify-between px-4 py-2.5 hover:bg-youtube-secondary transition-colors">
+            <li class="flex items-center justify-between px-4 py-2.5 {% if t.accessible %}hover:bg-youtube-secondary transition-colors{% endif %}">
+                {% if t.accessible %}
                 <a href="{% url 'forum_thread' t.pk %}" class="text-sm text-youtube-primary hover:underline truncate">
                     {% if t.is_pinned %}<span class="text-red-500">[pinned]</span> {% endif %}{{ t.title }}
                     <span class="text-youtube-secondary">({{ t.category.name }})</span>
@@ -49,6 +50,13 @@
                 <span class="text-xs text-youtube-secondary whitespace-nowrap ml-3">
                     {{ t.reply_count }} repl{{ t.reply_count|pluralize:"y,ies" }} &middot; {{ t.last_activity|timesince }} ago
                 </span>
+                {% else %}
+                <span class="text-sm truncate min-w-0">
+                    <span class="text-youtube-primary blur-sm select-none">{{ t.title }}</span>
+                    <span class="text-youtube-secondary">({{ t.category.name }})</span>
+                    <span class="text-xs text-red-400 ml-1">&#128274; subscribers only</span>
+                </span>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>
